@@ -1,8 +1,8 @@
 # AIOps Agentic RL — 诊断 Agent 的 SFT + GRPO 后训练
 
-> **项目简介**：在自研 [AIops-agent](AIops-agent/)（一个基于 Claude Agent SDK、已端到端跑通的 AIOps 故障诊断修复 Agent，本仓库通过 git submodule 引入）之上，往**模型后训练**方向再做一层——用 **Cold Start SFT + GRPO 两段式后训练**，把「故障诊断处置 Agent」的决策底座从外部 Claude Opus 换成**自训 Qwen3.5-9B + LoRA**。核心思想是把 AIops-agent 生产环境里用来兜底安全的 **PreToolUse hook、白名单正则、Diagnosis JSON schema 校验零改造复用为 GRPO 训练的稠密奖励信号**，让开源小模型也能撑起同一套 Agent 系统的诊断决策。真实跑完：单卡 A800-80GB、15 epoch GRPO ≈ 12 小时，产出可在 AIops-agent 自己的 13 个真实 docker 故障场景上替换使用的 LoRA checkpoint。
+> **项目简介**：在自研 [AIops-agent](AIops-agent/)（一个基于 Claude Agent SDK、已端到端跑通的 AIOps 故障诊断修复 Agent，本仓库通过 git submodule 引入）之上，往**模型后训练**方向再做一层——用 **Cold Start SFT + GRPO 两段式后训练**，把「故障诊断处置 Agent」的决策底座从外部 Claude Opus 换成**自训 Qwen3.5-9B + LoRA**。核心思想是把 AIops-agent 生产环境里用来兜底安全的 **PreToolUse hook、白名单正则、Diagnosis JSON schema 校验零改造复用为 GRPO 训练的稠密奖励信号**，让开源小模型也能撑起同一套 Agent 系统的诊断决策。真实跑完：单卡 A800-80GB、15 epoch GRPO ≈ 12 小时，产出可在 AIops-agent 自己的 13 个真实 docker 故障场景上替换使用的 LoRA checkpoint。源码见 GitHub：[`wjl8636/aiops-agentic-rl`](https://github.com/wjl8636/aiops-agentic-rl)。
 
-本仓库通过 **git submodule**（`.gitmodules`）引入 [`AIops-agent/`](AIops-agent/)，克隆后需先 `git submodule update --init`（指针已钉在评测口径一致的 commit）。本仓库**只读**消费它的 SDK 接口和判定信号（hook allow/deny、schema 校验、白名单命中），不改其核心代码。它与 AIops-agent 的关系必须讲清楚：
+本仓库通过 **git submodule**（`.gitmodules`）引入 [`AIops-agent/`](AIops-agent/)（GitHub: [`wjl8636/AIopsAgent`](https://github.com/wjl8636/AIopsAgent)），克隆后需先 `git submodule update --init`（指针已钉在评测口径一致的 commit）。本仓库**只读**消费它的 SDK 接口和判定信号（hook allow/deny、schema 校验、白名单命中），不改其核心代码。它与 AIops-agent 的关系必须讲清楚：
 
 - **AIops-agent（应用侧）**：告警进来，双 Agent（诊断 + 修复）用 Claude Opus 完成诊断 → 分流 → 自动止血或提 PR 的真实闭环。
 - **本仓库（训练侧）**：只训**诊断 Agent** 的决策底座。**修复 Agent 不训**——代码修复需要跨文件、跨 build/test 的通用编程能力，9B 稠密模型撑不住；诊断 Agent 才是长轨迹 + 多信号 + 结构化输出 + 终止决策这一套 Agentic RL 的甜点。这个边界写死在代码里：`reward/outcome_reward.py` 的 `_assert_no_fix_result_leak` tripwire 运行时断言 `FixResult.verified` 绝不能进入诊断奖励。
@@ -195,22 +195,22 @@ python3 -m eval.ablations.no_credit_assignment     # mechanism-level 消融
 
 ## 关键模块说明
 
-| 模块 | 一句话职责 | 对应教学文档 |
-|---|---|---|
-| `data/seeds/generate_seeds.py` | 四路合成种子告警（OTel 场景参数化 + flagd 组合 + 历史工单反演 + 手写兜底）+ v9 A/B/C/D 四家族定点增强 | 数据流水线 |
-| `data/clean/dedup.py` | MD5 精确去重 + BGE(bge-small-zh-v1.5) 语义去重（cosine 阈值 0.92）+ 词法兜底降级 | 数据流水线 |
-| `data/cold_start/prefix_split.py` | 按 tool_call 边界把 63 条轨迹前缀拆成 667 条工具级样本——撑起 SFT 最小训练规模的必要机制 | Cold Start SFT |
-| `reward/step_reward.py` | 每步 7 条稠密信号（schema/hook/进展/重复/末步惩罚），直接 import AIops-agent 的 hook 判定 | Reward 工程 |
-| `reward/credit_assignment.py` | kind × signal_type 覆盖度加权求和，替代 λ 指数衰减（防 GRPO 早期梯度塌陷） | Reward 工程 |
-| `reward/outcome_reward.py` | 结构化五项打分 + `_assert_no_fix_result_leak` tripwire（诊断 reward 绝不消费 FixResult） | Reward 工程 |
-| `reward/anti_hacking.py` | 四类结构性反 hacking：双源覆盖门 / evidence 可追溯 / real-health-only / 组方差降采样 | Reward 工程 |
-| `grpo/reward_router.py` | 把三层 reward 组装成训练环信号：per_step = step + credit 直接相加，terminal 只加到末步（无 mixing 系数） | Reward 工程 |
-| `verl_adapter/rollout_worker.py` | `RealHookRoutedTool`（真 hook 路由）+ SSH 反向隧道 bash 执行器，veRL rollout 桥到真实环境 | veRL 适配层 |
-| `verl_adapter/rag_service.py` | Milvus + BGE 记忆检索服务（`threading.Lock` 常驻串行化 + 启动预热防冷启 spike） | veRL 适配层 |
-| `grpo/verl_config/aiops_grpo.yaml` | veRL GRPO 配置（字段逐条标 [VERIFIED]/[ASSUMED]/[JUDGMENT] 状态） | GRPO 深度解析 |
-| `sft/llamafactory_config/qwen3_5_9b_lora_sft.yaml` | SFT 配置（LoRA r=16 α=32 bf16、全线性层 12 proj、sdpa） | Cold Start SFT |
-| `deploy/merge_lora.py` / `vllm_serve.sh` | LoRA 合并 + vLLM 服务化（原生 Anthropic Messages API） | 部署 |
-| `eval/ablations/*.py` | mechanism-level 消融：证明前缀展开 / credit assignment 是必要机制 | 评测口径 |
+| 模块 | 一句话职责 |
+|---|---|
+| `data/seeds/generate_seeds.py` | 四路合成种子告警（OTel 场景参数化 + flagd 组合 + 历史工单反演 + 手写兜底）+ v9 A/B/C/D 四家族定点增强 |
+| `data/clean/dedup.py` | MD5 精确去重 + BGE(bge-small-zh-v1.5) 语义去重（cosine 阈值 0.92）+ 词法兜底降级 |
+| `data/cold_start/prefix_split.py` | 按 tool_call 边界把 63 条轨迹前缀拆成 667 条工具级样本——撑起 SFT 最小训练规模的必要机制 |
+| `reward/step_reward.py` | 每步 7 条稠密信号（schema/hook/进展/重复/末步惩罚），直接 import AIops-agent 的 hook 判定 |
+| `reward/credit_assignment.py` | kind × signal_type 覆盖度加权求和，替代 λ 指数衰减（防 GRPO 早期梯度塌陷） |
+| `reward/outcome_reward.py` | 结构化五项打分 + `_assert_no_fix_result_leak` tripwire（诊断 reward 绝不消费 FixResult） |
+| `reward/anti_hacking.py` | 四类结构性反 hacking：双源覆盖门 / evidence 可追溯 / real-health-only / 组方差降采样 |
+| `grpo/reward_router.py` | 把三层 reward 组装成训练环信号：per_step = step + credit 直接相加，terminal 只加到末步（无 mixing 系数） |
+| `verl_adapter/rollout_worker.py` | `RealHookRoutedTool`（真 hook 路由）+ SSH 反向隧道 bash 执行器，veRL rollout 桥到真实环境 |
+| `verl_adapter/rag_service.py` | Milvus + BGE 记忆检索服务（`threading.Lock` 常驻串行化 + 启动预热防冷启 spike） |
+| `grpo/verl_config/aiops_grpo.yaml` | veRL GRPO 配置（字段逐条标 [VERIFIED]/[ASSUMED]/[JUDGMENT] 状态） |
+| `sft/llamafactory_config/qwen3_5_9b_lora_sft.yaml` | SFT 配置（LoRA r=16 α=32 bf16、全线性层 12 proj、sdpa） |
+| `deploy/merge_lora.py` / `vllm_serve.sh` | LoRA 合并 + vLLM 服务化（原生 Anthropic Messages API） |
+| `eval/ablations/*.py` | mechanism-level 消融：证明前缀展开 / credit assignment 是必要机制 |
 
 ## 与 AIops-agent 的关系（三条硬边界）
 
