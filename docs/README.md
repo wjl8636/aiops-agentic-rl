@@ -4,7 +4,7 @@
 
 > **本仓库的真实状态，请在读任何一份文档前先看这一段**：
 > - **代码与测试**：数据构造全流程代码（种子生成 → 清洗去重 → 冷启轨迹采集 → 渐进式前缀拆分）、reward 三层设计的完整实现、veRL 协议适配层、SFT/GRPO 的配置文件、评测 harness——这些都有对应的单元测试（见下文「如何跑测试」）。本仓的 `eval/run_baseline_comparison.py` + `data/clean/split/held_out`（22 条）承担 GRPO 训练期间的 periodic held-out 验证，工具端点走 `eval/model_endpoints.py` 里的 mock 后端，`aiops-agentic-rl/eval/reports/` 下存放的就是这一档产物。
-> - **训练与部署**：真实 Qwen3.5-9B LoRA **Cold Start SFT 训练**、**15-epoch GRPO 训练**（产出 checkpoint `aiops-qwen3.5-9b-grpo-step15`，单卡 A800-80GB，实测约 12 小时）、**LoRA 合并 + vLLM 服务化部署** + 接入 AIops-agent 的真实调用链路，都已在租卡环境跑通（环境版本坑、协议适配细节见 [`训练踩坑记录.md`](训练踩坑记录.md)）。
+> - **训练与部署**：真实 Qwen3.5-9B LoRA **Cold Start SFT 训练**、**15-epoch GRPO 训练**（产出 checkpoint `aiops-qwen3.5-9b-grpo-step15`，单卡 A800-80GB，实测约 12 小时）、**LoRA 合并 + vLLM 服务化部署** + 接入 AIops-agent 的真实调用链路，都已在租卡环境跑通。
 > - **数据规模**：冷启轨迹的真实采集（真调 Claude Opus API + 真实 docker 环境 + 场景化故障自动注入）v9 阶段 47 seed × 76 次 Opus API 调用，通过率 74%（35/47 accepted），加上 v8_base 保留 28 条 = **63 条通过轨迹**、实花 **$58.77**（预算 $60）；前缀拆分成 **667 条 SFT 样本**（604 tool_call + 63 diagnosis）；切分成 **train 74 / held_out 22**。
 > - **下游 headline**：由 **AIops-agent 自己的 `eval/run.py`**、在它 13 个真实 docker-compose 故障场景上跑出，报告见 AIops-agent 独立 checkout 的 `reports/{aiops-qwen3.5-9b-base-zeroshot_20260910, aiops-qwen3.5-9b-v9_20260908, aiops-qwen3.5-9b-grpo-step15_20260910, opus_20260819}/`：**zero-shot 25 rows service/kind/route = 0.48/0.52/0.36；v9-SFT 37 rows = 0.5676/0.6757/0.4595；GRPO step15 25 rows = 0.80/0.72/0.64；Opus 23 rows 全线约 0.913**。
 
