@@ -1,0 +1,15 @@
+{
+  "alertname": "TrendingNotUpdatingComplaint",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "运营反馈热门位轮换「失灵」：改了配置前台半天不变",
+    "description": "运营反馈推荐位的热门榜单「轮换失灵」：后台改了热门位配置，前台 /trending 半天过去还是旧榜单。无任何指标异常（服务健康、延迟正常、错误率 0），配置下发链路初步排查正常。开发怀疑服务端缓存没有按预期的 60s TTL 过期，已在预发复现「过了 TTL 仍返回旧值」。这是功能逻辑问题，需要改代码修复，请定位到具体代码。"
+  },
+  "startsAt": "2026-09-06T21:50:00Z",
+  "scenario_hint": "[v9增强/D2_用户报障] suspect_file=cache.py：客服/运营报障叙事（无指标异常），bug 在 master 的新文件里——验证「无指标信号时仍能正确定位代码根因判 code_fix，而不是误判成线上操作」"
+}

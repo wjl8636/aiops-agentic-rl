@@ -1,0 +1,15 @@
+{
+  "alertname": "HighErrorRate",
+  "service": "product-catalog",
+  "labels": {
+    "service": "product-catalog",
+    "severity": "critical",
+    "job": "product-catalog"
+  },
+  "annotations": {
+    "summary": "product-catalog 5xx 错误率飙升",
+    "description": "flagd 开关 productCatalogFailure 打开后触发，可以用 ./scripts/inject.sh s1 稳定复现。"
+  },
+  "startsAt": "2026-06-20T10:00:00Z",
+  "scenario_hint": "有明确 flagd 注入钩子，应判定为可复现"
+}

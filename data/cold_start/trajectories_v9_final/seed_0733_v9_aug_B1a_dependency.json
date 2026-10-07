@@ -1,0 +1,321 @@
+{
+  "alert": {
+    "alertname": "AdServiceFailingRequests",
+    "service": "ad",
+    "labels": {
+      "service": "ad",
+      "severity": "critical",
+      "job": "adservice"
+    },
+    "annotations": {
+      "summary": "ad 服务对广告请求整体返回失败，首页广告位空白",
+      "description": "ad 服务对广告请求开始整体返回失败（adFailure 开关疑似被打开），首页广告位大面积空白，广告收入曲线快速下滑。ad 容器进程本身存活、无重启，常规资源指标正常，但请求失败是真实的，请交叉核实开关状态与调用链后给出处置结论。"
+    },
+    "startsAt": "2026-09-07T17:30:00Z",
+    "scenario_hint": "[v9增强/B1a_交叉验证] flags=adFailure：注入真实故障但观测信号降级（Prometheus lag 冻结/ad 机制不生效/后端不可观测），OFREP 是权威第一信源——验证「OFREP 查 flag → Prometheus 读数正常不据此否定 → 换第二信源交叉验证 → 收敛输出 kind/route/confidence，不执行白名单外操作」"
+  },
+  "alert_id": "seed_0733_v9_aug_B1a_dependency",
+  "final_diagnosis": {
+    "summary": "ad 服务告警：flagd 中 adFailure 开关经 OFREP 实时确认确为 on（variant=on, reason=STATIC），但调用链与指标全面矛盾——GetAds 在整个告警窗口(17:00Z→06:30Z)错误率恒为 0、流量稳定在 ~0.77 req/s 无下滑，容器无重启/OOM，ad 日志持续成功，前端→ad 错误占比仅 0.03%(基线噪声)。唯一 ERR span 是 ad→flagd 的 ResolveBoolean 客户端调用(eventstream 重连噪声)，非 GetAds 业务失败。即：开关取值确实异常(被置 on)，但告警所述\"广告位空白/收入下滑\"的客户影响未被任何独立信源佐证。根因判定为功能开关取值错误(config)，处置应为在 flagd/配置中心将 adFailure 回退为 off——属线上配置变更，不在 docker 低风险白名单(restart/migrate/scale)内，且无任何白名单 docker 动作能改变 flagd STATIC 值(重启 ad 无效)，故未自动执行，交人工。因症状信号相互矛盾、无活跃客户影响证据，置信度下调。",
+    "kind": "config",
+    "suspect_service": "ad",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "online_op",
+    "remediation_detail": "建议(未自动执行)：在 flagd/配置中心将功能开关 adFailure 的 defaultVariant 从 \"on\" 回退为 \"off\" 并触发 flagd 重载，随后观察 GetAds 错误率与首页广告位。未执行原因：(1) 回退 flagd 开关属配置变更，不属于 restart_instance/migrate_instance/scale_resources 三类 docker 白名单命令形态，命中 hook 会被拦截；(2) 该 flag 为 flagd STATIC 值，重启/迁移/扩容 ad 容器均无法改变其取值，白名单动作对此根因无效，执行等于无效止血。补充建议给人工：本次交叉核实发现\"开关为 on\"与\"调用链零失败、流量平稳\"严重矛盾——首先请确认 AdServiceFailingRequests 告警规则是否在按开关状态(而非真实 GetAds 错误率)误触发；若确认无真实客户影响，回退开关属配置卫生清理而非紧急止血，可静音该告警。无需改代码(根因在 flagd 配置，不在源码)。",
+    "confidence": 0.5,
+    "evidence": [
+      "OFREP 实时开关值(权威): POST /ofrep/v1/evaluate/flags/adFailure 返回 {\"value\":true,\"key\":\"adFailure\",\"reason\":\"STATIC\",\"variant\":\"on\"} —— adFailure 开关确为 on(静态配置)",
+      "Prometheus 区间查询(query_range, 2026-09-07T17:00Z→2026-09-08T06:30Z, step30m): sum(rate(traces_span_metrics_calls_total{service_name=\"ad\",span_name=\"oteldemo.AdService/GetAds\",status_code=\"STATUS_CODE_ERROR\"}[5m])) 返回 ERROR series=0 —— 整个告警窗口 GetAds 从未出现错误",
+      "Prometheus 区间查询: GetAds 总调用速率在窗口内稳定 ~0.775/0.754/0.759/0.784 req/s，无下滑 —— 与'广告请求整体失败/收入快速下滑'矛盾",
+      "Prometheus 即时查询: traces_span_metrics_calls_total{service_name=\"ad\",span_name=\"oteldemo.AdService/GetAds\"} 仅 STATUS_CODE_UNSET=54686(成功)，STATUS_CODE_ERROR 无序列(0)",
+      "Prometheus: frontend→AdService 调用 STATUS_CODE_UNSET=30956 vs STATUS_CODE_ERROR=10(占比 0.03%，基线噪声)，上游未观测到广告调用批量失败",
+      "Jaeger: service=ad 且 tags error=true 的 trace 中，GetAds server span 状态非 error；唯一 ERR span 为 ad→flagd 的 flagd.evaluation.v2.Service/ResolveBoolean 客户端调用(eventstream 重连噪声，非业务失败)。operation=oteldemo.AdService/GetAds 叠加 error=true 过滤返回 0 条",
+      "docker: ad 容器 Up 13h, RestartCount=0, OOMKilled=false, CPU 0.77%, mem 242.4/300MiB —— 进程健康，资源正常",
+      "ad 容器日志(docker logs ad, 至 2026-09-08 06:24): 持续输出 'Targeted ad request received' 成功记录，grep error/exception/fail 自告警起始时刻起无任何命中",
+      "历史工单(search_past_incidents): ad 服务同类 flag 告警(adServiceHighCpu/adHighCpu、productCatalogFailure)历史均判为'开关未生效的失效故障'/证据矛盾，走向 info_only/low_confidence，佐证本类告警需以调用链实测而非告警文本为准",
+      "未执行任何自动处置：回退 flagd 开关非 docker 白名单动作(restart/migrate/scale)且对 STATIC flag 无效；执行台账应显示无放行命令"
+    ],
+    "time_window": {
+      "from": "2026-09-07T17:30:00Z",
+      "to": "2026-09-08T06:30:00Z"
+    },
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "feishu_low_confidence",
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"ad 服务告警：flagd 中 adFailure 开关经 OFREP 实时确认确为 on（variant=on, reason=STATIC），但调用链与指标全面矛盾——GetAds 在整个告警窗口(17:00Z→06:30Z)错误率恒为 0、流量稳定在 ~0.77 req/s 无下滑，容器无重启/OOM，ad 日志持续成功，前端→ad 错误占比仅 0.03%(基线噪声)。唯一 ERR span 是 ad→flagd 的 ResolveBoolean 客户端调用(eventstream 重连噪声)，非 GetAds 业务失败。即：开关取值确实异常(被置 on)，但告警所述\\\"广告位空白/收入下滑\\\"的客户影响未被任何独立信源佐证。根因判定为功能开关取值错误(config)，处置应为在 flagd/配置中心将 adFailure 回退为 off——属线上配置变更，不在 docker 低风险白名单(restart/migrate/scale)内，且无任何白名单 docker 动作能改变 flagd STATIC 值(重启 ad 无效)，故未自动执行，交人工。因症状信号相互矛盾、无活跃客户影响证据，置信度下调。\",\"kind\":\"config\",\"suspect_service\":\"ad\",\"remediation_type\":\"online_op\",\"remediation_detail\":\"建议(未自动执行)：在 flagd/配置中心将功能开关 adFailure 的 defaultVariant 从 \\\"on\\\" 回退为 \\\"off\\\" 并触发 flagd 重载，随后观察 GetAds 错误率与首页广告位。未执行原因：(1) 回退 flagd 开关属配置变更，不属于 restart_instance/migrate_instance/scale_resources 三类 docker 白名单命令形态，命中 hook 会被拦截；(2) 该 flag 为 flagd STATIC 值，重启/迁移/扩容 ad 容器均无法改变其取值，白名单动作对此根因无效，执行等于无效止血。补充建议给人工：本次交叉核实发现\\\"开关为 on\\\"与\\\"调用链零失败、流量平稳\\\"严重矛盾——首先请确认 AdServiceFailingRequests 告警规则是否在按开关状态(而非真实 GetAds 错误率)误触发；若确认无真实客户影响，回退开关属配置卫生清理而非紧急止血，可静音该告警。无需改代码(根因在 flagd 配置，不在源码)。\",\"also_code_fix\":false,\"confidence\":0.5,\"suspect_repo\":null,\"suspect_commit_hint\":null,\"suspect_file_hint\":null,\"time_window\":{\"from\":\"2026-09-07T17:30:00Z\",\"to\":\"2026-09-08T06:30:00Z\"},\"evidence\":[\"OFREP 实时开关值(权威): POST /ofrep/v1/evaluate/flags/adFailure 返回 {\\\"value\\\":true,\\\"key\\\":\\\"adFailure\\\",\\\"reason\\\":\\\"STATIC\\\",\\\"variant\\\":\\\"on\\\"} —— adFailure 开关确为 on(静态配置)\",\"Prometheus 区间查询(query_range, 2026-09-07T17:00Z→2026-09-08T06:30Z, step30m): sum(rate(traces_span_metrics_calls_total{service_name=\\\"ad\\\",span_name=\\\"oteldemo.AdService/GetAds\\\",status_code=\\\"STATUS_CODE_ERROR\\\"}[5m])) 返回 ERROR series=0 —— 整个告警窗口 GetAds 从未出现错误\",\"Prometheus 区间查询: GetAds 总调用速率在窗口内稳定 ~0.775/0.754/0.759/0.784 req/s，无下滑 —— 与'广告请求整体失败/收入快速下滑'矛盾\",\"Prometheus 即时查询: traces_span_metrics_calls_total{service_name=\\\"ad\\\",span_name=\\\"oteldemo.AdService/GetAds\\\"} 仅 STATUS_CODE_UNSET=54686(成功)，STATUS_CODE_ERROR 无序列(0)\",\"Prometheus: frontend→AdService 调用 STATUS_CODE_UNSET=30956 vs STATUS_CODE_ERROR=10(占比 0.03%，基线噪声)，上游未观测到广告调用批量失败\",\"Jaeger: service=ad 且 tags error=true 的 trace 中，GetAds server span 状态非 error；唯一 ERR span 为 ad→flagd 的 flagd.evaluation.v2.Service/ResolveBoolean 客户端调用(eventstream 重连噪声，非业务失败)。operation=oteldemo.AdService/GetAds 叠加 error=true 过滤返回 0 条\",\"docker: ad 容器 Up 13h, RestartCount=0, OOMKilled=false, CPU 0.77%, mem 242.4/300MiB —— 进程健康，资源正常\",\"ad 容器日志(docker logs ad, 至 2026-09-08 06:24): 持续输出 'Targeted ad request received' 成功记录，grep error/exception/fail 自告警起始时刻起无任何命中\",\"历史工单(search_past_incidents): ad 服务同类 flag 告警(adServiceHighCpu/adHighCpu、productCatalogFailure)历史均判为'开关未生效的失效故障'/证据矛盾，走向 info_only/low_confidence，佐证本类告警需以调用链实测而非告警文本为准\",\"未执行任何自动处置：回退 flagd 开关非 docker 白名单动作(restart/migrate/scale)且对 STATIC flag 无效；执行台账应显示无放行命令\"]}",
+    "teacher_model": "claude-4.8-opus-google",
+    "usage": {
+      "input_tokens": 3081,
+      "output_tokens": 13837,
+      "cache_creation_input_tokens": 52750,
+      "cache_read_input_tokens": 292279
+    },
+    "cost_usd": 0.8371569999999999,
+    "num_turns": 16,
+    "duration_ms": 205673,
+    "model_usage": {
+      "claude-4.8-opus-google": {
+        "inputTokens": 3081,
+        "outputTokens": 13837,
+        "cacheReadInputTokens": 292279,
+        "cacheCreationInputTokens": 52750,
+        "webSearchRequests": 0,
+        "costUSD": 0.8371569999999999,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000,
+        "canonicalModel": "claude-4.8-opus-google",
+        "provider": "firstParty"
+      }
+    },
+    "pruning": {
+      "steps_before": 15,
+      "steps_after": 13,
+      "removed": [
+        {
+          "step_index_1based": 8,
+          "tool_name": "Bash",
+          "reason": "skeleton-repeat:docker-logs:ad",
+          "command_snippet": "docker logs ad --since 2026-09-07T17:25:00Z 2>&1 | grep -iE 'error|exception|fail|adFailure|GetAdsException|throw' | head -20"
+        },
+        {
+          "step_index_1based": 10,
+          "tool_name": "Bash",
+          "reason": "no-signal-no-fact",
+          "command_snippet": "cd /aiops-agentic-rl/AIops-agent/workspace/ad 2>/dev/null && rg -l -i 'adFailure|ad_failure|adfa"
+        }
+      ],
+      "restored_by_verification": []
+    }
+  },
+  "steps": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/adFailure' -H 'Content-Type: application/json' -d '{}'",
+        "description": "Query flagd OFREP for adFailure flag value"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"value\":true,\"key\":\"adFailure\",\"reason\":\"STATIC\",\"variant\":\"on\",\"metadata\":{}}",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps -a --format '{{.Names}}\\t{{.Status}}' | grep -i ad",
+        "description": "Check ad container status"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "load-generator\tUp About a minute\nad\tUp 13 hours",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker inspect --format '{{.RestartCount}} {{.State.OOMKilled}}' $(docker ps -a --format '{{.Names}}' | grep -iE 'ad$|-ad-|_ad_' | head -1) 2>/dev/null; echo \"---stats---\"; docker stats --no-stream 2>/dev/null | grep -i ad",
+        "description": "Check ad restart count and resource usage"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "0 false\n---stats---\nad70f2bfc4e0   valkey-cart          0.26%     11.08MiB / 20MiB      55.39%    14MB / 7.96MB     8.74MB / 8.55MB   5\nbe8ec0691c02   load-generator       74.27%    1.333GiB / 1.465GiB   91.00%    133MB / 4.54MB    51.8MB / 5.07GB   325\ne6b577996adf   kafka                1.96%     586.8MiB / 620MiB     94.64%    13.1MB / 21.2MB   88MB / 215MB      100\n2faf3ead3c4f   currency             0.59%     2.898MiB / 20MiB      14.49%    49.1MB / 101MB    123kB / 0B        15\nb25f17aecb4f   ad                   0.77%     242.4MiB / 300MiB     80.81%    19.5MB / 94.3MB   29.2MB / 58.6MB   39\nfd763f70adf4   opensearch           2.49%     1.052GiB / 1.1GiB     95.66%    7.84GB / 494MB    10.8GB / 33.2GB   114",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs ad --tail 60 2>&1 | tail -40",
+        "description": "Check ad service logs"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "2026-09-08 06:24:01 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=0afa6e634c66de6d31f3a5e37e3ccd36 span_id=836320ecb5070bcc trace_flags=01 \n2026-09-08 06:24:01 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=c6e8ecde0eb3cbe708d1265f134451a3 span_id=8fb580579731e709 trace_flags=01 \n2026-09-08 06:24:02 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=0a66c886e76b91bb58ea04363a94687b span_id=7ce5d47b352acd15 trace_flags=01 \n2026-09-08 06:24:02 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=54bea99285efe02b3bea17f41515ec32 span_id=f0e1b172571e885b trace_flags=01 \n2026-09-08 06:24:07 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=65d06e7208bbcf5b18d46eaaf4643ca8 span_id=f3bb3266ac43385b trace_flags=01 \n2026-09-08 06:24:07 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=af86bdbf72b38b0188a4562bdb267933 span_id=fb1f4636984ba828 trace_flags=01 \n2026-09-08 06:24:11 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=7737807fc89344e48a3832a22bf900fa span_id=7df314d762d0c2d1 trace_flags=01 \n2026-09-08 06:24:11 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=0db718b6827bc939d856aac8b0d9ea57 span_id=85ac208e95cadd58 trace_flags=01 \n2026-09-08 06:24:11 - oteldemo.AdService - no baggage found in context trace_id=c9ad771d615d60671b104a2d3c606d75 span_id=55ebb194e89d8478 trace_flags=01 \n2026-09-08 06:24:11 - oteldemo.AdService - Targeted ad request received for [books] trace_id=c9ad771d615d60671b104a2d3c606d75 span_id=55ebb194e89d8478 trace_flags=01 \n2026-09-08 06:24:14 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=f8449a1d53cf047050829451c8daf6f4 span_id=5d8950226cc42ada trace_flags=01 \n2026-09-08 06:24:14 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=50f574653cf0e74109d2fb0e97ae7eef span_id=45b6d73fe36795f1 trace_flags=01 \n2026-09-08 06:24:15 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=d6e6165b1d14a2fc13324262e9f83431 span_id=1369c8362cb3ea72 trace_flags=01 \n2026-09-08 06:24:16 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=3c5b1fe59c65218e961e162514362816 span_id=76d4b6a4c4e7fff8 trace_flags=01 \n2026-09-08 06:24:19 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=1e2949e384daa9b59ab1609019e6b49d span_id=368687f16f1b35f3 trace_flags=01 \n2026-09-08 06:24:19 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=19b0ffd8f8f78dba33077ff8d557693b span_id=42112a470e25a2b3 trace_flags=01 \n2026-09-08 06:24:20 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=0fcc9b00cf710b1e6ae4426bbb3b31d2 span_id=fa908830d3f2afe8 trace_flags=01 \n2026-09-08 06:24:20 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=3ebfd7c58220ecb306ad74d37d387762 span_id=35e21d76be7d60ab trace_flags=01 \n2026-09-08 06:24:25 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=65c97fa9b62c717159149efe570e27f7 span_id=3747e9748f7b399a trace_flags=01 \n2026-09-08 06:24:25 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=c53b307f22fd1c1c605a03f028421be0 span_id=70c7b9ad9fc4f023 trace_flags=01 \n2026-09-08 06:24:29 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=b293176d8dc695523e7bef805730a4a5 span_id=0af34a5ef3a2192a trace_flags=01 \n2026-09-08 06:24:29 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=ec8d54bede7e62c48fede240aa1398bf span_id=13b3ee9c8458b1a3 trace_flags=01 \n2026-09-08 06:24:30 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=f98efdc1eb1590a611084aaf91a8fcf9 span_id=d283fb9a8409e860 trace_flags=01 \n2026-09-08 06:24:31 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=1209e106fcdcc6f20da01c066c0ee59f span_id=89677cdeb3f91282 trace_flags=01 \n2026-09-08 06:24:34 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=13a6bf9abc211500eb2562a0794b8fef span_id=0f90761019076819 trace_flags=01 \n2026-09-08 06:24:35 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=e67256b79902500e42110b4e179c89af span_id=3df35e6075fc3a55 trace_flags=01 \n2026-09-08 06:24:37 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=a8d9223ff8ba22b57292838dbb16775e span_id=e570ecc25886f406 trace_flags=01 \n2026-09-08 06:24:37 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=9e912e7f109f6764cbaba1503e2cfe11 span_id=e54edc02a0284870 trace_flags=01 \n2026-09-08 06:24:40 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=59c6aaf8a0130f08f1a7dc6988d42b20 span_id=9c02fad19e3c6683 trace_flags=01 \n2026-09-08 06:24:40 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=7efaf2740510505af58ed4b8ad3f002c span_id=0c284c966816e9cf trace_flags=01 \n2026-09-08 06:24:40 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=eb3eb9ad353c5c1c77ab6e3f32c71ddb span_id=29492a4c74b373b5 trace_flags=01 \n2026-09-08 06:24:40 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=33e29d9aba6f6b0b91e6d589e2d2c2de span_id=13858e7b8d3dd64c trace_flags=01 \n2026-09-08 06:24:44 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=db1150e1f1a081d6e026dad56fbc3193 span_id=d7367e5062781aae trace_flags=01 \n2026-09-08 06:24:44 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=3681fe306d83f740acfc4c4b83562982 span_id=25a7c23508d69d06 trace_flags=01 \n2026-09-08 06:24:45 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=cca7ee65a41d5fcd08672425fb9afa1e span_id=0158f658e84e4e5b trace_flags=01 \n2026-09-08 06:24:46 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=ac161efcf4be21510af410b4b12a2dac span_id=3e7e7f4457d4d3fd trace_flags=01 \n2026-09-08 06:24:48 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=2f9e53b84381f4fe642f4234e2e627cd span_id=ca1917ed7f908e6d trace_flags=01 \n2026-09-08 06:24:48 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=acdb1a4d73f16997e733b2141e3764c7 span_id=f7614f1a8ac29b23 trace_flags=01 \n2026-09-08 06:24:52 - oteldemo.AdService - no baggage found in context trace_id=5a9701e953f662072ebca31794e35e2a span_id=075f275526b5b4fa trace_flags=01 \n2026-09-08 06:24:52 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=5a9701e953f662072ebca31794e35e2a span_id=075f275526b5b4fa trace_flags=01",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -g 'http://localhost:16686/jaeger/ui/api/traces?service=ad&lookback=1h&limit=30&tags=%7B%22error%22%3A%22true%22%7D' | python3 -c \"import sys,json; d=json.load(sys.stdin); ts=d.get('data',[]); print('error traces:',len(ts));\nimport itertools\nfor t in ts[:3]:\n  tid=t['traceID']\n  for s in t['spans']:\n    tags={tg['key']:tg['value'] for tg in s.get('tags',[])}\n    if tags.get('error')=='true' or tags.get('otel.status_code')=='ERROR':\n      print(tid[:16], s['operationName'], tags.get('otel.status_description') or tags.get('exception.message') or tags.get('status.message',''))\" 2>&1 | head -30",
+        "description": "Query Jaeger for ad error traces"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "error traces: 30\n0fcc9b00cf710b1e flagd.evaluation.v2.Service/ResolveBoolean \n0fcc9b00cf710b1e flagd.evaluation.v2.Service/ResolveBoolean \n0fcc9b00cf710b1e flagd.evaluation.v2.Service/ResolveBoolean \n3ebfd7c58220ecb3 flagd.evaluation.v2.Service/ResolveBoolean \n3ebfd7c58220ecb3 flagd.evaluation.v2.Service/ResolveBoolean \n3ebfd7c58220ecb3 flagd.evaluation.v2.Service/ResolveBoolean \n8294246981894339 flagd.evaluation.v2.Service/EventStream",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s --data-urlencode 'query=traces_span_metrics_calls_total{service_name=\"ad\",status_code=\"STATUS_CODE_ERROR\"}' 'http://localhost:9090/api/v1/query' | python3 -c \"import sys,json; d=json.load(sys.stdin); r=d.get('data',{}).get('result',[]); print('metric series:',len(r));\nfor s in r[:10]: print(s['metric'].get('span_name'), s['metric'].get('span_kind'), s['value'][1])\" 2>&1 | head -20",
+        "description": "Query Prometheus ad error rate metric"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "metric series: 16\nflagd.evaluation.v2.Service/EventStream SPAN_KIND_CLIENT 4844\nflagd.evaluation.v2.Service/EventStream SPAN_KIND_CLIENT 4\nflagd.evaluation.v2.Service/ResolveBoolean SPAN_KIND_CLIENT 93297\nflagd.evaluation.v2.Service/EventStream SPAN_KIND_CLIENT 79512\nflagd.evaluation.v2.Service/ResolveBoolean SPAN_KIND_CLIENT 20280\nflagd.evaluation.v2.Service/ResolveBoolean SPAN_KIND_CLIENT 99\nflagd.evaluation.v2.Service/EventStream SPAN_KIND_CLIENT 43\nflagd.evaluation.v2.Service/ResolveBoolean SPAN_KIND_CLIENT 11865\nflagd.evaluation.v2.Service/ResolveBoolean SPAN_KIND_CLIENT 309\nflagd.evaluation.v2.Service/EventStream SPAN_KIND_CLIENT 10036",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -g 'http://localhost:16686/jaeger/ui/api/traces?service=ad&operation=oteldemo.AdService%2FGetAds&lookback=1h&limit=15&tags=%7B%22error%22%3A%22true%22%7D' | python3 -c \"\nimport sys,json\nd=json.load(sys.stdin); ts=d.get('data',[])\nprint('GetAds error traces:',len(ts))\nfor t in ts[:3]:\n  for s in t['spans']:\n    if s['operationName']=='oteldemo.AdService/GetAds':\n      tags={tg['key']:tg['value'] for tg in s.get('tags',[])}\n      print(t['traceID'][:16], 'status=',tags.get('otel.status_code'), 'desc=',tags.get('otel.status_description') or tags.get('error'))\n      # print logs/events\n      for l in s.get('logs',[]):\n        fs={f['key']:f['value'] for f in l.get('fields',[])}\n        print('   event:', fs.get('event'), fs.get('exception.type'), fs.get('exception.message'))\n\" 2>&1 | head -40",
+        "description": "Get GetAds server span errors with exception details"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "GetAds error traces: 0",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== ad operations ===\"; curl -s 'http://localhost:16686/jaeger/ui/api/operations?service=ad' | python3 -c \"import sys,json; print(json.load(sys.stdin).get('data'))\" 2>&1 | head\necho \"=== full error trace inspect ===\"\ncurl -s -g 'http://localhost:16686/jaeger/ui/api/traces?service=ad&lookback=1h&limit=10&tags=%7B%22error%22%3A%22true%22%7D' | python3 -c \"\nimport sys,json\nd=json.load(sys.stdin); ts=d.get('data',[])\nt=ts[0]\nprint('trace',t['traceID'][:16])\nfor s in sorted(t['spans'],key=lambda x:x.get('startTime',0)):\n  tags={tg['key']:tg['value'] for tg in s.get('tags',[])}\n  proc=t['processes'].get(s['processID'],{}).get('serviceName','?')\n  err='ERR' if tags.get('otel.status_code')=='ERROR' or tags.get('error')=='true' else ''\n  print(f\\\"  {proc:12} {s['operationName']:45} {err} {tags.get('otel.status_description','')}\\\")\n\" 2>&1 | head -40",
+        "description": "List ad operations and inspect full error trace tree"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== ad operations ===\n[{'name': 'flagd.evaluation.v2.Service/ResolveBoolean', 'spanKind': 'client'}, {'name': 'oteldemo.AdService/GetAds', 'spanKind': 'server'}, {'name': 'getAdsByCategory', 'spanKind': 'internal'}, {'name': 'resolve', 'spanKind': 'client'}, {'name': 'getRandomAds', 'spanKind': 'internal'}, {'name': 'flagd.evaluation.v2.Service/EventStream', 'spanKind': 'client'}]\n=== full error trace inspect ===\ntrace 25273a958229f567\n  frontend-web HTTP GET                                       \n  frontend-proxy ingress                                        \n  frontend-proxy router frontend egress                         \n  frontend     GET /api/data                                  \n  frontend     GET                                            \n  frontend     grpc.oteldemo.AdService/GetAds                 \n  frontend     executing api route (pages) /api/data          \n  ad           oteldemo.AdService/GetAds                      \n  ad           resolve                                        \n  ad           flagd.evaluation.v2.Service/ResolveBoolean    ERR \n  ad           getAdsByCategory                               \n  ad           resolve                                        \n  ad           flagd.evaluation.v2.Service/ResolveBoolean    ERR \n  ad           resolve                                        \n  ad           flagd.evaluation.v2.Service/ResolveBoolean    ERR",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s --data-urlencode 'query=sum by (span_name,status_code) (traces_span_metrics_calls_total{service_name=\"ad\",span_name=\"oteldemo.AdService/GetAds\"})' 'http://localhost:9090/api/v1/query' | python3 -c \"import sys,json;d=json.load(sys.stdin);[print(s['metric'].get('status_code'),s['value'][1]) for s in d['data']['result']]\" 2>&1\necho \"=== caller frontend errors to ad ===\"\ncurl -s --data-urlencode 'query=sum by (status_code) (traces_span_metrics_calls_total{service_name=\"frontend\",span_name=~\".*AdService.*\"})' 'http://localhost:9090/api/v1/query' | python3 -c \"import sys,json;d=json.load(sys.stdin);[print(s['metric'].get('status_code'),s['value'][1]) for s in d['data']['result']]\" 2>&1",
+        "description": "Query GetAds error/ok counts and frontend caller errors"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "STATUS_CODE_UNSET 54686\n=== caller frontend errors to ad ===\nSTATUS_CODE_UNSET 30956\nSTATUS_CODE_ERROR 10",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd /aiops-agentic-rl/AIops-agent\necho \"=== workspace/ad exists? ===\"; ls workspace/ 2>/dev/null; echo \"---\"; ls workspace/ad 2>/dev/null | head\necho \"=== search flag names across ad ===\"\nrg -n -i 'adFailure|getRandomAds|StatusRuntimeException|FeatureFlag|getBoolValue|GetAdsException|checkAdFailure' workspace/ad 2>/dev/null | head -30",
+        "description": "Check workspace/ad and search flag mechanism"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== workspace/ad exists? ===\nrecommendation\n---\n=== search flag names across ad ===",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== GetAds ERROR rate over alert window (range) ===\"\ncurl -s --data-urlencode 'query=sum(rate(traces_span_metrics_calls_total{service_name=\"ad\",span_name=\"oteldemo.AdService/GetAds\",status_code=\"STATUS_CODE_ERROR\"}[5m]))' --data-urlencode 'start=2026-09-07T17:00:00Z' --data-urlencode 'end=2026-09-08T06:30:00Z' --data-urlencode 'step=1800s' 'http://localhost:9090/api/v1/query_range' | python3 -c \"import sys,json;d=json.load(sys.stdin);r=d['data']['result'];print('ERROR series:',len(r)); [print(v[0],v[1]) for s in r for v in s['values']]\" 2>&1 | head -30\necho \"=== GetAds TOTAL (all status) rate over window ===\"\ncurl -s --data-urlencode 'query=sum(rate(traces_span_metrics_calls_total{service_name=\"ad\",span_name=\"oteldemo.AdService/GetAds\"}[5m]))' --data-urlencode 'start=2026-09-07T17:00:00Z' --data-urlencode 'end=2026-09-08T06:30:00Z' --data-urlencode 'step=3600s' 'http://localhost:9090/api/v1/query_range' | python3 -c \"import sys,json;d=json.load(sys.stdin);r=d['data']['result']; [print(v[0],round(float(v[1]),3)) for s in r for v in s['values']]\" 2>&1 | head -20",
+        "description": "Range query GetAds error and total rates over alert window"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== GetAds ERROR rate over alert window (range) ===\nERROR series: 0\n=== GetAds TOTAL (all status) rate over window ===\n1788836400 0.775\n1788840000 0.754\n1788843600 0.759\n1788847200 0.784",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "mcp__aiops_rag__search_past_incidents",
+      "tool_input": {
+        "query": "ad 服务广告请求失败 adFailure 功能开关被打开 首页广告位空白",
+        "top_k": 3
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "检索到以下历史相似诊断工单（按相似度降序）：\n\n[1] 相似度=0.6082 | 服务=ad | 类型=resource | 当时走向=info_only\n    根因摘要: ad 服务 CPU 告警：flagd 开关未生效的失效故障\n    处置: 当前未执行任何自动止血操作。原因：告警描述中提到的 \"adServiceHighCpu\" 开关经代码溯源实际配置名是 \"adHighCpu\"，检查 vendor/otel-demo/src/flagd/demo.flagd.json 确认该 flag 当前值为 off（defaultVariant: \"off\"），且 state=ENABLED 但默认关闭。实时观测：docker stats 显示 ad 容器 CPU 0.11%、内存 237/300MiB 正常；Prometheus jvm_cpu_recent_utilization_ratio{job=\"opentelemetry-demo/ad\"}≈0.001（0.1%，近乎空载）；demo_ad_requests_total 指标近 30 分钟有少量请求记录，无流量突增；ad 容器 StartedAt=2026-09-07T17:01:09Z、RestartCount=0，与告警 startsAt=2026-06-20 相差近 3 个月，说明当前运行实例的生命周期与告警触发时不是同一次运行。综合判断：这是一条陈旧/失效告警，或对应的故障注入在当前环境未实际生效，当前不存在需要止活的活跃 CPU 饱和问题，故未执行任何白名单内的自动处置（restart_instance/restart_ad 等无正当执行前提）。建议：1) 人工确认此告警是否为陈旧/重复告警，必要时在告警系统中静音/关闭；2) 若后续该 flag 被重新置为 on，且 jvm_cpu_recent_utilization_ratio{job=\"opentelemetry-demo/ad\"} 明显抬升（如>0.5）、请求量同步上涨、p99 延迟 p99 恶化，则可对 ad（白名单授权目标）执行 docker update --cpus <n> ad 提升 CPU 上限或 docker restart ad 短期止血；3) 若观察到 flag 已被人为置为 on 且 CPU 真实饱和（>80%）但非流量驱动（请求量平稳），则属代码侧 CPU 密集型计算本身资源需求特性，应评估是否需扩容或代码优化，而非\"故障\"。\n[2] 相似度=0.6064 | 服务=ad | 类型=resource | 当时走向=feishu_low_confidence\n    根因摘要: 告警描述 ad 服务因 flagd 开关 adServiceHighCpu(实际 flag 名 adHighCpu) 导致 CPU 打满、p99 延迟攀升，但当前实时观测与该描述矛盾：flagd 配置中 adHighCpu.defaultVariant 当前为 \"off\"（state=ENABLED 但默认关闭）；Prometheus jvm_cpu_recent_utilization_ratio{job=\"opentelemetry-demo/ad\"} 近 10 分钟稳定在 0.0005~0.0007（近乎空载）；docker stats 显示 ad 容器 CPU 仅 0.15%~0.2%；demo_ad_requests_total 无任何时间序列（无流量）。告警 startsAt 为 2026-06-20，与当前日期 2026-08-17 相差近两个月，且容器为近期新启动（Up ~4min，RestartCount=0），说明当前运行的实例与告警发生时并非同一次生命周期。综合判断：此告警很可能是历史/失效告警，或对应的 flagd 故障注入未在当前环境实际生效/已被回退，当前不存在需要止血的活跃 CPU 饱和问题。因此未执行任何自动处置（白名单内的 scale_resources/restart 均无正当理由使用）；若后续该 flag 被重新置为 on 且 CPU/延迟指标真实抬升，则应对 ad 走 online_op（抬高 CPU 资源上限或临时限流），是否需要代码侧改动需另行评估。\n    处置: 未自动执行处置：当前实时证据显示服务并非处于故障态（flag 关闭、CPU 空载、无流量），不满足\"根因明确\"的止血前提，按规则证据矛盾/不足时不执行任何白名单操作。建议：1) 人工确认此告警是否为陈旧/重复告警（startsAt 与当前时间相差近2个月，且容器为新近启动、RestartCount=0），必要时在告警系统里手动关闭/静音；2) 复核 flagd 配置 vendor/otel-demo/src/flagd/demo.flagd.json 中 adHighCpu 是否曾被置 on 后又回退为 off（当前已是 off，无需再操作）；3) 若重新观测到 jvm_cpu_recent_utilization_ratio{job=\"opentelemetry-demo/ad\"} 明显抬升且伴随请求量同步上涨、p99 恶化，则可对 ad 执行低风险白名单操作 `docker update --cpus <n> ad` 提升资源上限,或 `docker restart ad` 短期止血；若流量平稳但 CPU 高应转为 code_fix 排查热点代码。当前不具备执行条件，交人工继续观察。\n[3] 相似度=0.6044 | 服务=product-catalog | 类型=dependency | 当时走向=feishu_low_confidence\n    根因摘要: 告警描述与 scenario_hint 明确指向：flagd 功能开关 productCatalogFailure 被打开，导致 product-catalog 的 GetProduct 接口对上游 frontend/recommendation 的调用大量 5xx——属于\"自身被开关人为致障\"的依赖型故障。但当前沙箱环境未部署 product-catalog 容器、Prometheus 无该服务的采集目标（up 查询为空）、Jaeger API 仅返回 UI 静态页无法拉取该服务的失败 trace，因此无法用实时指标/调用链交叉验证 5xx 飙升与具体故障跳数；本地 flagd 配置文件（vendor/otel-demo/src/flagd/demo.flagd.json）里该 flag 当前 defaultVariant 为 \"off\"，与告警所述\"开关刚被打开\"的实时状态不一致，说明此环境只是复现告警文本场景，并非真实故障现场。结论以告警自身描述为主要依据，未获得独立实时证据佐证，置信度下调。且 product-catalog 不在本 Agent 低风险自动处置的授权目标清单内，回退 flagd 开关也不属于 restart_instance/migrate_instance/scale_resources 三类白名单动作形态，因此未执行任何自动处置，建议交人工在 flagd/配置中心将 productCatalogFailure 改回 off 并观察 frontend/recommendation 侧调用成功率恢复。\n    处置: 建议动作（未自动执行）：把 flagd 中 productCatalogFailure 的 defaultVariant 从 \"on\" 回退为 \"off\"（配置文件 vendor/otel-demo/src/flagd/demo.flagd.json 第4-11行,或对应配置中心/flag 管理面板），并让 flagd 重新加载配置生效，随后观察 product-catalog GetProduct 的 5xx 错误率及 frontend、recommendation 对其调用的成功率是否回落。未自动执行的原因：(1) product-catalog 不在当前低风险自动处置的授权目标清单（ad, cart, checkout, currency, email, frontend, payment, quote, recommendation, shipping）内；(2) 回退功能开关属于配置变更，不属于 restart_instance/migrate_instance/scale_resources 三类白名单命令形态,命中 hook 会被直接拦截。因此本次仅输出诊断建议,处置需人工在 flagd/配置中心完成。\n\n注意：历史工单仅供参考，请结合当前实时观测证据独立判断，不要盲目照搬。",
+      "signal_types_covered": [
+        "prometheus",
+        "jaeger",
+        "kubectl_status",
+        "rag_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "ad 服务告警：flagd 中 adFailure 开关经 OFREP 实时确认确为 on（variant=on, reason=STATIC），但调用链与指标全面矛盾——GetAds 在整个告警窗口(17:00Z→06:30Z)错误率恒为 0、流量稳定在 ~0.77 req/s 无下滑，容器无重启/OOM，ad 日志持续成功，前端→ad 错误占比仅 0.03%(基线噪声)。唯一 ERR span 是 ad→flagd 的 ResolveBoolean 客户端调用(eventstream 重连噪声)，非 GetAds 业务失败。即：开关取值确实异常(被置 on)，但告警所述\"广告位空白/收入下滑\"的客户影响未被任何独立信源佐证。根因判定为功能开关取值错误(config)，处置应为在 flagd/配置中心将 adFailure 回退为 off——属线上配置变更，不在 docker 低风险白名单(restart/migrate/scale)内，且无任何白名单 docker 动作能改变 flagd STATIC 值(重启 ad 无效)，故未自动执行，交人工。因症状信号相互矛盾、无活跃客户影响证据，置信度下调。",
+        "kind": "config",
+        "suspect_service": "ad",
+        "remediation_type": "online_op",
+        "remediation_detail": "建议(未自动执行)：在 flagd/配置中心将功能开关 adFailure 的 defaultVariant 从 \"on\" 回退为 \"off\" 并触发 flagd 重载，随后观察 GetAds 错误率与首页广告位。未执行原因：(1) 回退 flagd 开关属配置变更，不属于 restart_instance/migrate_instance/scale_resources 三类 docker 白名单命令形态，命中 hook 会被拦截；(2) 该 flag 为 flagd STATIC 值，重启/迁移/扩容 ad 容器均无法改变其取值，白名单动作对此根因无效，执行等于无效止血。补充建议给人工：本次交叉核实发现\"开关为 on\"与\"调用链零失败、流量平稳\"严重矛盾——首先请确认 AdServiceFailingRequests 告警规则是否在按开关状态(而非真实 GetAds 错误率)误触发；若确认无真实客户影响，回退开关属配置卫生清理而非紧急止血，可静音该告警。无需改代码(根因在 flagd 配置，不在源码)。",
+        "also_code_fix": false,
+        "confidence": 0.5,
+        "suspect_repo": null,
+        "suspect_commit_hint": null,
+        "suspect_file_hint": null,
+        "time_window": {
+          "from": "2026-09-07T17:30:00Z",
+          "to": "2026-09-08T06:30:00Z"
+        },
+        "evidence": [
+          "OFREP 实时开关值(权威): POST /ofrep/v1/evaluate/flags/adFailure 返回 {\"value\":true,\"key\":\"adFailure\",\"reason\":\"STATIC\",\"variant\":\"on\"} —— adFailure 开关确为 on(静态配置)",
+          "Prometheus 区间查询(query_range, 2026-09-07T17:00Z→2026-09-08T06:30Z, step30m): sum(rate(traces_span_metrics_calls_total{service_name=\"ad\",span_name=\"oteldemo.AdService/GetAds\",status_code=\"STATUS_CODE_ERROR\"}[5m])) 返回 ERROR series=0 —— 整个告警窗口 GetAds 从未出现错误",
+          "Prometheus 区间查询: GetAds 总调用速率在窗口内稳定 ~0.775/0.754/0.759/0.784 req/s，无下滑 —— 与'广告请求整体失败/收入快速下滑'矛盾",
+          "Prometheus 即时查询: traces_span_metrics_calls_total{service_name=\"ad\",span_name=\"oteldemo.AdService/GetAds\"} 仅 STATUS_CODE_UNSET=54686(成功)，STATUS_CODE_ERROR 无序列(0)",
+          "Prometheus: frontend→AdService 调用 STATUS_CODE_UNSET=30956 vs STATUS_CODE_ERROR=10(占比 0.03%，基线噪声)，上游未观测到广告调用批量失败",
+          "Jaeger: service=ad 且 tags error=true 的 trace 中，GetAds server span 状态非 error；唯一 ERR span 为 ad→flagd 的 flagd.evaluation.v2.Service/ResolveBoolean 客户端调用(eventstream 重连噪声，非业务失败)。operation=oteldemo.AdService/GetAds 叠加 error=true 过滤返回 0 条",
+          "docker: ad 容器 Up 13h, RestartCount=0, OOMKilled=false, CPU 0.77%, mem 242.4/300MiB —— 进程健康，资源正常",
+          "ad 容器日志(docker logs ad, 至 2026-09-08 06:24): 持续输出 'Targeted ad request received' 成功记录，grep error/exception/fail 自告警起始时刻起无任何命中",
+          "历史工单(search_past_incidents): ad 服务同类 flag 告警(adServiceHighCpu/adHighCpu、productCatalogFailure)历史均判为'开关未生效的失效故障'/证据矛盾，走向 info_only/low_confidence，佐证本类告警需以调用链实测而非告警文本为准",
+          "未执行任何自动处置：回退 flagd 开关非 docker 白名单动作(restart/migrate/scale)且对 STATIC flag 无效；执行台账应显示无放行命令"
+        ]
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "prometheus",
+        "jaeger",
+        "logs",
+        "rag_history"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "remediation_type": "online_op",
+  "suspect_service": "payment",
+  "expect_route": "feishu_online_op",
+  "expect_kind_any_of": [
+    "dependency",
+    "config"
+  ],
+  "expect_confidence_range": [
+    0.6,
+    1.0
+  ],
+  "expect_max_steps": 12,
+  "_family": "C1"
+}

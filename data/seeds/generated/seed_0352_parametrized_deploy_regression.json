@@ -1,0 +1,15 @@
+{
+  "alertname": "MemoryLeakOOM",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 服务内存持续上涨、趋向 OOM",
+    "description": "recommendation 服务的内存占用最近持续走高，容器频繁被 OOMKilled 重启。时间线上正好卡在最近一次发版之后，怀疑是最近一次发版引入的某个 commit 里，用一个全局 dict 按请求 key 缓存/累加计算结果，却没有配 TTL 或淘汰策略，随着不同 key 不断出现，dict 体积单调增长。"
+  },
+  "startsAt": "2026-07-06T13:30:00Z",
+  "scenario_hint": "[参数化扩增/deploy_regression] 泄漏机制=无界 dict 累加（unbounded_dict_accumulation）：内存泄漏 capstone 的泄漏点变体，对应 scripts/fixtures/recommendation 的不同 fixture 版本"
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：hist-2025-11-gc-config-change",
+    "description": "2025-11 的一次事故：ad 服务的一次运行时参数配置变更间接改变了 GC 触发频率，变更后 CPU 使用率持续处于高位，请求延迟 p99 明显上升，但没有伴随代码发版。"
+  },
+  "startsAt": "2026-07-22T15:30:00Z",
+  "scenario_hint": "[历史工单反演/static] source_ticket=hist-2025-11-gc-config-change：从手写历史工单摘要样例反向抽取的告警（Milvus 检索池不足时的静态兜底）"
+}

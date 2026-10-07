@@ -1,0 +1,8 @@
+{
+  "remediation_type": "code_fix",
+  "suspect_service": "recommendation",
+  "expect_route": "feishu_low_confidence",
+  "expect_kind_any_of": [
+    "deploy_regression"
+  ]
+}

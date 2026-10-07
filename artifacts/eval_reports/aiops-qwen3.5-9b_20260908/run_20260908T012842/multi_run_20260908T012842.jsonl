@@ -1,0 +1,1 @@
+{"scenario": "s12_race", "route": "auto_remediated", "service_ok": true, "kind_ok": false, "route_ok": false, "triggered_code_fix": false, "fix_verified": null, "changed_files_hit": false, "diag_latency_s": 453.3, "fix_latency_s": null, "total_latency_s": 453.3, "pr_created": null, "run_index": 0, "ts": "2026-09-08T01:36:19+00:00"}

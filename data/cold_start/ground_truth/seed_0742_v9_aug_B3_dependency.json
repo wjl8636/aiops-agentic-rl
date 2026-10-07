@@ -1,0 +1,32 @@
+{
+  "remediation_type": "info_only",
+  "suspect_service": "product-catalog",
+  "expect_route": "info_only",
+  "expect_kind_any_of": [
+    "dependency",
+    "deploy_regression",
+    "config"
+  ],
+  "expect_confidence_range": [
+    0.5,
+    0.95
+  ],
+  "expect_negative_claim": {
+    "object": null,
+    "markers": [
+      "已恢复",
+      "已自愈",
+      "已平息",
+      "已消除",
+      "无活跃",
+      "当前无",
+      "已消化",
+      "已停止",
+      "不再",
+      "已复位",
+      "已关闭",
+      "已解除"
+    ]
+  },
+  "_family": "B3"
+}

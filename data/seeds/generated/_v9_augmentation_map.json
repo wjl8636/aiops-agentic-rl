@@ -1,0 +1,363 @@
+{
+  "seed_0713_v9_aug_A1_resource": {
+    "family": "A1",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0714_v9_aug_A1_dependency": {
+    "family": "A1",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0715_v9_aug_A1_dependency": {
+    "family": "A1",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0716_v9_aug_A1_resource": {
+    "family": "A1",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0717_v9_aug_A1_dependency": {
+    "family": "A1",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0718_v9_aug_A1_dependency": {
+    "family": "A1",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0719_v9_aug_A2_dependency": {
+    "family": "A2",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "productCatalogFailure"
+      ]
+    }
+  },
+  "seed_0720_v9_aug_A2_dependency": {
+    "family": "A2",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "cartFailure"
+      ]
+    }
+  },
+  "seed_0721_v9_aug_A2_resource": {
+    "family": "A2",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "kafkaQueueProblems"
+      ]
+    }
+  },
+  "seed_0722_v9_aug_A2_config": {
+    "family": "A2",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "imageSlowLoad"
+      ]
+    }
+  },
+  "seed_0723_v9_aug_A3_dependency": {
+    "family": "A3",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "productCatalogFailure"
+      ]
+    }
+  },
+  "seed_0724_v9_aug_A3_resource": {
+    "family": "A3",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "kafkaQueueProblems"
+      ]
+    }
+  },
+  "seed_0725_v9_aug_A3_dependency": {
+    "family": "A3",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "cartFailure"
+      ]
+    }
+  },
+  "seed_0726_v9_aug_B1a_resource": {
+    "family": "B1a",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "kafkaQueueProblems"
+      ]
+    }
+  },
+  "seed_0727_v9_aug_B1a_resource": {
+    "family": "B1a",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "kafkaQueueProblems"
+      ]
+    }
+  },
+  "seed_0728_v9_aug_B1a_resource": {
+    "family": "B1a",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "kafkaQueueProblems"
+      ]
+    }
+  },
+  "seed_0729_v9_aug_B1a_resource": {
+    "family": "B1a",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "adHighCpu"
+      ]
+    }
+  },
+  "seed_0730_v9_aug_B1a_resource": {
+    "family": "B1a",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "adHighCpu"
+      ]
+    }
+  },
+  "seed_0731_v9_aug_B1a_config": {
+    "family": "B1a",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "imageSlowLoad"
+      ]
+    }
+  },
+  "seed_0732_v9_aug_B1a_resource": {
+    "family": "B1b",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "kafkaQueueProblems",
+        "adHighCpu"
+      ]
+    }
+  },
+  "seed_0733_v9_aug_B1a_dependency": {
+    "family": "B1b",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "adFailure"
+      ]
+    }
+  },
+  "seed_0734_v9_aug_B1b_resource": {
+    "family": "B1b",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "adHighCpu"
+      ]
+    }
+  },
+  "seed_0735_v9_aug_B1b_resource": {
+    "family": "B1b",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0736_v9_aug_B1b_resource": {
+    "family": "B1b",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0737_v9_aug_B1b_config": {
+    "family": "B1b",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0738_v9_aug_B2_dependency": {
+    "family": "B2",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0739_v9_aug_B2_config": {
+    "family": "B2",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0740_v9_aug_B2_resource": {
+    "family": "B2",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0741_v9_aug_B3_resource": {
+    "family": "B3",
+    "injection": {
+      "mode": "pre_inject",
+      "flag": "kafkaQueueProblems",
+      "on_s": 90,
+      "drain_s": 240
+    }
+  },
+  "seed_0742_v9_aug_B3_dependency": {
+    "family": "B3",
+    "injection": {
+      "mode": "pre_inject",
+      "flag": "productCatalogFailure",
+      "on_s": 90,
+      "drain_s": 60
+    }
+  },
+  "seed_0743_v9_aug_B3_config": {
+    "family": "B3",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0744_v9_aug_C1_dependency": {
+    "family": "C1",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "paymentFailure"
+      ]
+    }
+  },
+  "seed_0745_v9_aug_C1_dependency": {
+    "family": "C1",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "cartFailure"
+      ]
+    }
+  },
+  "seed_0746_v9_aug_C1_dependency": {
+    "family": "C1",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "productCatalogFailure"
+      ]
+    }
+  },
+  "seed_0747_v9_aug_C1_dependency": {
+    "family": "C1",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "recommendationCacheFailure"
+      ]
+    }
+  },
+  "seed_0748_v9_aug_C1_dependency": {
+    "family": "C1",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "adFailure"
+      ]
+    }
+  },
+  "seed_0749_v9_aug_C1_config": {
+    "family": "C1",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "imageSlowLoad"
+      ]
+    }
+  },
+  "seed_0750_v9_aug_C1_config": {
+    "family": "C1",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "adManualGc"
+      ]
+    }
+  },
+  "seed_0751_v9_aug_C1_dependency": {
+    "family": "C1",
+    "injection": {
+      "mode": "flags",
+      "flags": [
+        "paymentUnreachable"
+      ]
+    }
+  },
+  "seed_0752_v9_aug_D1_deploy_regression": {
+    "family": "D1",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0753_v9_aug_D1_deploy_regression": {
+    "family": "D1",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0754_v9_aug_D1_deploy_regression": {
+    "family": "D1",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0755_v9_aug_D1_deploy_regression": {
+    "family": "D1",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0756_v9_aug_D2_deploy_regression": {
+    "family": "D2",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0757_v9_aug_D2_deploy_regression": {
+    "family": "D2",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0758_v9_aug_D3_deploy_regression": {
+    "family": "D3",
+    "injection": {
+      "mode": "none"
+    }
+  },
+  "seed_0759_v9_aug_D3_deploy_regression": {
+    "family": "D3",
+    "injection": {
+      "mode": "none"
+    }
+  }
+}

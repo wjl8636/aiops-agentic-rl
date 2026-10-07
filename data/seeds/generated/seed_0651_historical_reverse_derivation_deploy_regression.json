@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0052-recommendation-deploy_regression",
+    "description": "recommendation 服务因发版引入的无界内存缓存导致内存单调上升、逼近 OOM。当前部署镜像 sha=f18f452（deploys.log 标记 LATEST_DEPLOY suspect，替换基线 ac26792），git diff 确认该 commit 把模块级 `_seen_product_ids` 由 `deque(maxlen=128)` 改为无界 `list[str]`，并在 get_recommendations() 中被 extend() 且从不裁剪，配合后台压测线程持续调用，工作集内存无上限增长直至触发容器内存上限(256MiB)。已执行低风险止血 docker restart，内存已回落；根治需回退该缓存的边界，否则复发。"
+  },
+  "startsAt": "2026-07-22T09:30:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0052-recommendation-deploy_regression：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

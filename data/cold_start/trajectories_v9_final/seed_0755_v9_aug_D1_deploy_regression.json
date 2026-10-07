@@ -1,0 +1,238 @@
+{
+  "alert": {
+    "alertname": "MemberPriceOffByOneCent",
+    "service": "recommendation",
+    "labels": {
+      "service": "recommendation",
+      "severity": "warning",
+      "job": "recommendation"
+    },
+    "annotations": {
+      "summary": "会员价在 0.5 分边界上差一分钱，应四舍五入实际被舍掉",
+      "description": "财务对账发现会员价展示与应付金额在 0.5 分边界上偶发差 1 分钱：例如 PRODUCT-2 按 50%折扣应为 499.5 分，按展示口径四舍五入应为 500 分，实际展示/返回 499 分。会员价功能是最近合并进 master 上线的（deploys.log 有 member pricing rollout 记录），QA 在预发稳定复现：所有落在 .5 分边界的折扣价一律少了 1 分。金额相关的问题需要尽快修，服务指标正常，怀疑纯代码 bug。"
+    },
+    "startsAt": "2026-09-06T16:45:00Z",
+    "scenario_hint": "[v9增强/D1_新bug实例] suspect_file=pricing.py：bug 在 GitHub 上游仓 master 的pricing.py（与 flagd 无关，不注入开关）——Agent 读 workspace/recommendation 克隆（master）定位 bug，验证「code_fix + suspect_file_hint 命中新文件 + 不做任何线上操作」，证据拓扑与测评一致（读仓找 bug，不是本地 fixture）"
+  },
+  "alert_id": "seed_0755_v9_aug_D1_deploy_regression",
+  "final_diagnosis": {
+    "summary": "recommendation 服务会员价存在四舍五入 bug：pricing.py 的 member_price_cents() 用 int(discounted) 截断取整（向零舍入），而价格展示策略要求 half-up 四舍五入。凡折扣价落在 .5 分边界（如 PRODUCT-2 按 50% 折扣 = 499.5 分）都被舍成 499 分，少 1 分钱。该 bug 由 2026-09-06 上线的 member pricing 功能（commit a3f6812）引入，属发版代码回归，纯代码 bug，无需线上处置，交修复 Agent 改代码提 PR。",
+    "kind": "deploy_regression",
+    "suspect_service": "recommendation",
+    "suspect_repo": "recommendation",
+    "suspect_commit_hint": "a3f6812",
+    "suspect_file_hint": "pricing.py (member_price_cents)",
+    "remediation_type": "code_fix",
+    "remediation_detail": "修改 workspace/recommendation/pricing.py 的 member_price_cents()：把 `return int(discounted)`（向零截断）改为按策略 half-up 四舍五入。建议用整数运算避免浮点误差：`return (base * (100 - discount_pct) + 50) // 100`（或 Decimal ROUND_HALF_UP）。注意不要用内置 round()——它是银行家舍入（round-half-even），500.5 会被舍成 500 而非 501，不满足 half-up 策略。改后 test_pricing.py::test_member_price_rounds_half_up（断言 PRODUCT-2/50% == 500）应通过。无需任何线上处置：服务指标正常，重启/扩容无法修复代码缺陷；回滚会整体撤掉会员价功能且属高风险，不采用。",
+    "confidence": 0.96,
+    "evidence": [
+      "deploys.log：2026-09-06 recommendation image=recommendation:a3f6812 note=member pricing rollout；告警 startsAt 2026-09-06 与该发版时间吻合，确认为发版引入的回归。",
+      "git show a3f6812（workspace/recommendation）：新增 pricing.py，member_price_cents() 计算 `discounted = base*(100-discount_pct)/100` 后 `return int(discounted)`，docstring 却写明 'rounded half-up'——int() 是向零截断，与 half-up 策略矛盾，即为根因。",
+      "git show HEAD:pricing.py（部署中的 HEAD f1beaa4）确认 member_price_cents() 仍为 `return int(discounted)`，bug 在当前线上代码中存在。",
+      "本地复算：PRODUCT-2 list=999 分，50% 折扣 → 999*(100-50)/100 = 499.5 分，int(499.5)=499，而 half-up 应为 500，正好差 1 分钱，与告警/QA 复现现象完全一致。",
+      "commit 自带回归测试 test_pricing.py::test_member_price_rounds_half_up 断言 member_price_cents('PRODUCT-2',50)==500，当前实现返回 499，测试会失败，佐证实现与既定策略不符。",
+      "docker ps 显示 recommendation 容器 Up 正常、无异常重启，符合告警所述‘服务指标正常’，排除资源/依赖类故障，锁定为纯代码逻辑 bug。"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": null,
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"recommendation 服务会员价存在四舍五入 bug：pricing.py 的 member_price_cents() 用 int(discounted) 截断取整（向零舍入），而价格展示策略要求 half-up 四舍五入。凡折扣价落在 .5 分边界（如 PRODUCT-2 按 50% 折扣 = 499.5 分）都被舍成 499 分，少 1 分钱。该 bug 由 2026-09-06 上线的 member pricing 功能（commit a3f6812）引入，属发版代码回归，纯代码 bug，无需线上处置，交修复 Agent 改代码提 PR。\",\"kind\":\"deploy_regression\",\"suspect_service\":\"recommendation\",\"remediation_type\":\"code_fix\",\"remediation_detail\":\"修改 workspace/recommendation/pricing.py 的 member_price_cents()：把 `return int(discounted)`（向零截断）改为按策略 half-up 四舍五入。建议用整数运算避免浮点误差：`return (base * (100 - discount_pct) + 50) // 100`（或 Decimal ROUND_HALF_UP）。注意不要用内置 round()——它是银行家舍入（round-half-even），500.5 会被舍成 500 而非 501，不满足 half-up 策略。改后 test_pricing.py::test_member_price_rounds_half_up（断言 PRODUCT-2/50% == 500）应通过。无需任何线上处置：服务指标正常，重启/扩容无法修复代码缺陷；回滚会整体撤掉会员价功能且属高风险，不采用。\",\"confidence\":0.96,\"suspect_repo\":\"recommendation\",\"suspect_commit_hint\":\"a3f6812\",\"suspect_file_hint\":\"pricing.py (member_price_cents)\",\"evidence\":[\"deploys.log：2026-09-06 recommendation image=recommendation:a3f6812 note=member pricing rollout；告警 startsAt 2026-09-06 与该发版时间吻合，确认为发版引入的回归。\",\"git show a3f6812（workspace/recommendation）：新增 pricing.py，member_price_cents() 计算 `discounted = base*(100-discount_pct)/100` 后 `return int(discounted)`，docstring 却写明 'rounded half-up'——int() 是向零截断，与 half-up 策略矛盾，即为根因。\",\"git show HEAD:pricing.py（部署中的 HEAD f1beaa4）确认 member_price_cents() 仍为 `return int(discounted)`，bug 在当前线上代码中存在。\",\"本地复算：PRODUCT-2 list=999 分，50% 折扣 → 999*(100-50)/100 = 499.5 分，int(499.5)=499，而 half-up 应为 500，正好差 1 分钱，与告警/QA 复现现象完全一致。\",\"commit 自带回归测试 test_pricing.py::test_member_price_rounds_half_up 断言 member_price_cents('PRODUCT-2',50)==500，当前实现返回 499，测试会失败，佐证实现与既定策略不符。\",\"docker ps 显示 recommendation 容器 Up 正常、无异常重启，符合告警所述‘服务指标正常’，排除资源/依赖类故障，锁定为纯代码逻辑 bug。\"]}",
+    "teacher_model": "claude-4.8-opus-google",
+    "usage": {
+      "input_tokens": 2927,
+      "output_tokens": 4537,
+      "cache_creation_input_tokens": 49297,
+      "cache_read_input_tokens": 226294
+    },
+    "cost_usd": 0.54931325,
+    "num_turns": 11,
+    "duration_ms": 93556,
+    "model_usage": {
+      "claude-4.8-opus-google": {
+        "inputTokens": 2927,
+        "outputTokens": 4537,
+        "cacheReadInputTokens": 226294,
+        "cacheCreationInputTokens": 49297,
+        "webSearchRequests": 0,
+        "costUSD": 0.54931325,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000,
+        "canonicalModel": "claude-4.8-opus-google",
+        "provider": "firstParty"
+      }
+    },
+    "pruning": {
+      "steps_before": 10,
+      "steps_after": 9,
+      "removed": [
+        {
+          "step_index_1based": 9,
+          "tool_name": "Bash",
+          "reason": "no-signal-no-fact",
+          "command_snippet": "curl -s --max-time 3 \"http://localhost:33191/price/PRODUCT-2/50\"; echo; curl -s --max-time 3 \"http://localhost:33191/price/PRODUCT-0/10\"; echo"
+        }
+      ],
+      "restored_by_verification": []
+    }
+  },
+  "steps": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "ls && echo \"---deploys---\" && find . -maxdepth 3 -name 'deploys.log' 2>/dev/null && echo \"---workspace---\" && ls workspace/ 2>/dev/null",
+        "description": "List repo, find deploys.log and workspace"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "agent\nAIOps-Agent-技术方案.md\nalerts\ndeploys.log\ndocker-compose.override.yml\ndocker-compose.yml\neval\nLICENSE\nREADME.md\nreports\nrequirements.txt\nscripts\ntests\nvendor\nworkspace\n授权条款.md\n---deploys---\n./deploys.log\n---workspace---\nrecommendation",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps --format '{{.Names}}\\t{{.Image}}\\t{{.Status}}' 2>/dev/null | grep -i recommend",
+        "description": "Check recommendation container status"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "recommendation\tghcr.nju.edu.cn/open-telemetry/demo:latest-recommendation\tUp 55 seconds",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "grep -i -n 'member\\|pric\\|recommend' deploys.log | tail -30; echo \"=== tail deploys ===\"; tail -20 deploys.log",
+        "description": "Grep member pricing in deploys.log"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "2:2026-08-31T04:00:49Z  recommendation  image=recommendation:f627b82  sha=f627b82  note=baseline\n3:2026-09-01T04:00:49Z  recommendation  image=recommendation:9d81a82  sha=9d81a82  note=popularity ranking rollout\n4:2026-09-02T04:00:49Z  recommendation  image=recommendation:f72ced8  sha=f72ced8  note=trending + dedupe rollout\n5:2026-09-03T04:00:49Z  recommendation  image=recommendation:327dda5  sha=327dda5  note=category hit stats rollout\n6:2026-09-04T04:00:49Z  recommendation  image=recommendation:bef6e91  sha=bef6e91  note=catalog pagination rollout\n7:2026-09-05T04:00:49Z  recommendation  image=recommendation:337da52  sha=337da52  note=trending cache rollout\n8:2026-09-06T04:00:49Z  recommendation  image=recommendation:a3f6812  sha=a3f6812  note=member pricing rollout\n9:2026-09-07T04:00:49Z  recommendation  image=recommendation:b0872d1  sha=b0872d1  note=LATEST_DEPLOY (suspect)\n=== tail deploys ===\n# service deploy history (image tag = git SHA)\n2026-08-31T04:00:49Z  recommendation  image=recommendation:f627b82  sha=f627b82  note=baseline\n2026-09-01T04:00:49Z  recommendation  image=recommendation:9d81a82  sha=9d81a82  note=popularity ranking rollout\n2026-09-02T04:00:49Z  recommendation  image=recommendation:f72ced8  sha=f72ced8  note=trending + dedupe rollout\n2026-09-03T04:00:49Z  recommendation  image=recommendation:327dda5  sha=327dda5  note=category hit stats rollout\n2026-09-04T04:00:49Z  recommendation  image=recommendation:bef6e91  sha=bef6e91  note=catalog pagination rollout\n2026-09-05T04:00:49Z  recommendation  image=recommendation:337da52  sha=337da52  note=trending cache rollout\n2026-09-06T04:00:49Z  recommendation  image=recommendation:a3f6812  sha=a3f6812  note=member pricing rollout\n2026-09-07T04:00:49Z  recommendation  image=recommendation:b0872d1  sha=b0872d1  note=LATEST_DEPLOY (suspect)",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd workspace/recommendation && git log --oneline -20",
+        "description": "Git log recommendation"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "f1beaa4 docs: start a known-issues list\nb0872d1 perf: track all seen product ids for analytics\na3f6812 feat: member-price display for recommended products\n337da52 feat: cache the trending list with a TTL\nbef6e91 feat: paginated catalog browsing\n327dda5 feat: track per-category recommendation hits\nf72ced8 feat: merge merchandising trending ids into recommendations\n9d81a82 feat: rank recommendations by popularity\nf627b82 recommendation service baseline (bounded recent-id cache)\nShell cwd was reset to /aiops-agentic-rl/AIops-agent",
+      "signal_types_covered": [
+        "git_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd workspace/recommendation && git show a3f6812 --stat && echo \"=========== DIFF ===========\" && git show a3f6812",
+        "description": "Show member pricing commit diff"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "commit a3f681205d25f571fff0c68523e0c2844bbe5133\nAuthor: aiops <aiops@example.com>\nDate:   Sun Sep 6 04:00:49 2026 +0000\n\n    feat: member-price display for recommended products\n    \n    Show list price and discounted member price in cents; round half-up to the cent per price-display policy.\n\n pricing.py               | 31 +++++++++++++++++++++++++++++++\n recommendation_server.py | 11 +++++++++++\n test_pricing.py          | 16 ++++++++++++++++\n 3 files changed, 58 insertions(+)\n=========== DIFF ===========\ncommit a3f681205d25f571fff0c68523e0c2844bbe5133\nAuthor: aiops <aiops@example.com>\nDate:   Sun Sep 6 04:00:49 2026 +0000\n\n    feat: member-price display for recommended products\n    \n    Show list price and discounted member price in cents; round half-up to the cent per price-display policy.\n\ndiff --git a/pricing.py b/pricing.py\nnew file mode 100644\nindex 0000000..c52aca4\n--- /dev/null\n+++ b/pricing.py\n@@ -0,0 +1,31 @@\n+\"\"\"Member-price display for the recommendation storefront.\n+\n+Shows a discounted member price next to recommended products. All money is\n+kept in integer cents; price-display policy is to round half-up to the cent.\n+\"\"\"\n+from __future__ import annotations\n+\n+# list prices, in cents, for every catalog / trending sku\n+_LIST_PRICES_CENTS: dict[str, int] = {\n+    \"PRODUCT-0\": 1999,\n+    \"PRODUCT-1\": 2499,\n+    \"PRODUCT-2\": 999,\n+    \"PRODUCT-3\": 4999,\n+    \"PRODUCT-4\": 1499,\n+    \"PRODUCT-5\": 2999,\n+    \"PRODUCT-6\": 799,\n+    \"PRODUCT-7\": 3499,\n+    \"PRODUCT-8\": 1299,\n+    \"PRODUCT-9\": 2199,\n+}\n+\n+\n+def list_price_cents(product_id: str) -> int:\n+    return _LIST_PRICES_CENTS[product_id]\n+\n+\n+def member_price_cents(product_id: str, discount_pct: int) -> int:\n+    \"\"\"Member price in cents after a whole-percent discount, rounded half-up.\"\"\"\n+    base = _LIST_PRICES_CENTS[product_id]\n+    discounted = base * (100 - discount_pct) / 100\n+    return int(discounted)\ndiff --git a/recommendation_server.py b/recommendation_server.py\nindex 1f517cc..2dd3a3e 100644\n--- a/recommendation_server.py\n+++ b/recommendation_server.py\n@@ -22,6 +22,7 @@ import dedupe\n import stats\n import pagination\n import cache\n+import pricing\n \n # recent-id cache: bounded, keeps the last 128 served ids\n _seen_product_ids: deque[str] = deque(maxlen=128)\n@@ -93,6 +94,16 @@ class _Handler(BaseHTTPRequestHandler):\n                 cached = list(_TRENDING)\n                 _trending_cache.set(\"trending\", cached, _TRENDING_TTL_SECONDS)\n             self._json({\"trending\": cached})\n+        elif self.path.startswith(\"/price/\"):\n+            # path: /price/<product_id>/<discount_pct>\n+            parts = self.path.strip(\"/\").split(\"/\")\n+            product_id = parts[1] if len(parts) > 1 else \"\"\n+            discount = int(parts[2]) if len(parts) > 2 else 10\n+            self._json({\n+                \"product_id\": product_id,\n+                \"list_price_cents\": pricing.list_price_cents(product_id),\n+                \"member_price_cents\": pricing.member_price_cents(product_id, discount),\n+            })\n         elif self.path.startswith(\"/metrics\"):\n             # Prometheus text-exposition: the signals an on-call can scrape.\n             body = (\ndiff --git a/test_pricing.py b/test_pricing.py\nnew file mode 100644\nindex 0000000..3a9a165\n--- /dev/null\n+++ b/test_pricing.py\n@@ -0,0 +1,16 @@\n+\"\"\"Regression test for pricing.py — member prices must round half-up to the\n+cent at the .5 boundary (price-display policy).\"\"\"\n+from __future__ import annotations\n+\n+import pricing\n+\n+\n+def test_member_price_rounds_half_up():\n+    # 999 * (100 - 50) / 100 = 499.5 cents -> policy: round half-up -> 500\n+    got = pricing.member_price_cents(\"PRODUCT-2\", 50)\n+    assert got == 500, f\"member price must round half-up (expected 500, got {got})\"\n+\n+\n+def test_member_price_when_no_rounding_is_needed():\n+    # 1999 * (100 - 10) / 100 = 1799.1 cents -> 1799 either way\n+    assert pricing.member_price_cents(\"PRODUCT-0\", 10) == 1799\nShell cwd was reset to /aiops-agentic-rl/AIops-agent",
+      "signal_types_covered": [
+        "prometheus",
+        "git_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd workspace/recommendation && echo \"=== HEAD pricing.py member_price ===\" && git show HEAD:pricing.py | sed -n '24,31p' && echo \"=== deployed image sha ===\" && git rev-parse --short HEAD",
+        "description": "Confirm bug at HEAD"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== HEAD pricing.py member_price ===\n    return _LIST_PRICES_CENTS[product_id]\n\n\ndef member_price_cents(product_id: str, discount_pct: int) -> int:\n    \"\"\"Member price in cents after a whole-percent discount, rounded half-up.\"\"\"\n    base = _LIST_PRICES_CENTS[product_id]\n    discounted = base * (100 - discount_pct) / 100\n    return int(discounted)\n=== deployed image sha ===\nf1beaa4\nShell cwd was reset to /aiops-agentic-rl/AIops-agent",
+      "signal_types_covered": [
+        "git_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "port=$(docker inspect recommendation --format '{{range $p,$c := .NetworkSettings.Ports}}{{$p}} {{end}}' 2>/dev/null); echo \"ports: $port\"; for p in 8080 9464 1010; do echo \"--- try $p /price/PRODUCT-2/50 ---\"; curl -s --max-time 3 \"http://localhost:$p/price/PRODUCT-2/50\" && echo; done",
+        "description": "Reproduce price endpoint live"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Exit code 7\nports: 9001/tcp \n--- try 8080 /price/PRODUCT-2/50 ---\n<!DOCTYPE html><html><head><meta charSet=\"utf-8\" data-next-head=\"\"/><meta name=\"viewport\" content=\"width=device-width\" data-next-head=\"\"/><title data-next-head=\"\">404: This page could not be found</title><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"/><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin=\"anonymous\"/><link rel=\"preload\" href=\"/_next/static/css/4a86f4d07dfbe27c.css\" as=\"style\"/><link href=\"https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,300;1,400;1,500;1,600;1,700;1,800&amp;display=swap\" rel=\"stylesheet\"/><link rel=\"stylesheet\" href=\"/_next/static/css/4a86f4d07dfbe27c.css\" data-n-g=\"\"/><noscript data-n-css=\"\"></noscript><script defer=\"\" noModule=\"\" src=\"/_next/static/chunks/polyfills-42372ed130431b0a.js\"></script><script src=\"/_next/static/chunks/webpack-8261614bdae5d353.js\" defer=\"\"></script><script src=\"/_next/static/chunks/framework-8c66923947fb0c35.js\" defer=\"\"></script><script src=\"/_next/static/chunks/main-ebe572c14257abb4.js\" defer=\"\"></script><script src=\"/_next/static/chunks/pages/_app-22a628ad4ce43c0f.js\" defer=\"\"></script><script src=\"/_next/static/chunks/pages/_error-41608b100cc61246.js\" defer=\"\"></script><script src=\"/_next/static/G-Aa61AgZf-2vIhwvhGmL/_buildManifest.js\" defer=\"\"></script><script src=\"/_next/static/G-Aa61AgZf-2vIhwvhGmL/_ssgManifest.js\" defer=\"\"></script></head><body><div id=\"__next\"><div style=\"font-family:system-ui,&quot;Segoe UI&quot;,Roboto,Helvetica,Arial,sans-serif,&quot;Apple Color Emoji&quot;,&quot;Segoe UI Emoji&quot;;height:100vh;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:center\"><div style=\"line-height:48px\"><style>body{color:#000;background:#fff;margin:0}.next-error-h1{border-right:1px solid rgba(0,0,0,.3)}@media (prefers-color-scheme:dark){body{color:#fff;background:#000}.next-error-h1{border-right:1px solid rgba(255,255,255,.3)}}</style><h1 class=\"next-error-h1\" style=\"display:inline-block;margin:0 20px 0 0;padding-right:23px;font-size:24px;font-weight:500;vertical-align:top\">404</h1><div style=\"display:inline-block\"><h2 style=\"font-size:14px;font-weight:400;line-height:28px\">This page could not be found<!-- -->.</h2></div></div></div></div><script>\n        window.ENV = {\n          NEXT_PUBLIC_PLATFORM: 'local',\n          NEXT_PUBLIC_OTEL_SERVICE_NAME: 'frontend-web',\n          NEXT_PUBLIC_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: 'http://localhost:8080/otlp-http/v1/traces',\n          IS_SYNTHETIC_REQUEST: 'false',\n        };</script><script id=\"__NEXT_DATA__\" type=\"application/json\">{\"props\":{\"pageProps\":{\"statusCode\":404,\"hostname\":\"6c5c336c9924\"}},\"page\":\"/_error\",\"query\":{},\"buildId\":\"G-Aa61AgZf-2vIhwvhGmL\",\"isFallback\":false,\"isExperimentalCompile\":false,\"gip\":true,\"appGip\":true,\"scriptLoader\":[]}</script></body></html>\n--- try 9464 /price/PRODUCT-2/50 ---\n--- try 1010 /price/PRODUCT-2/50 ---",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker port recommendation 2>/dev/null; echo \"--- verify logic locally ---\"; python3 -c \"base=999; d=50; print('member_price_cents PRODUCT-2 50% =', int(base*(100-d)/100), '(policy expects 500 via half-up)')\"",
+        "description": "Get mapped port and verify rounding logic"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "9001/tcp -> 0.0.0.0:33191\n9001/tcp -> [::]:33191\n--- verify logic locally ---\nmember_price_cents PRODUCT-2 50% = 499 (policy expects 500 via half-up)",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "recommendation 服务会员价存在四舍五入 bug：pricing.py 的 member_price_cents() 用 int(discounted) 截断取整（向零舍入），而价格展示策略要求 half-up 四舍五入。凡折扣价落在 .5 分边界（如 PRODUCT-2 按 50% 折扣 = 499.5 分）都被舍成 499 分，少 1 分钱。该 bug 由 2026-09-06 上线的 member pricing 功能（commit a3f6812）引入，属发版代码回归，纯代码 bug，无需线上处置，交修复 Agent 改代码提 PR。",
+        "kind": "deploy_regression",
+        "suspect_service": "recommendation",
+        "remediation_type": "code_fix",
+        "remediation_detail": "修改 workspace/recommendation/pricing.py 的 member_price_cents()：把 `return int(discounted)`（向零截断）改为按策略 half-up 四舍五入。建议用整数运算避免浮点误差：`return (base * (100 - discount_pct) + 50) // 100`（或 Decimal ROUND_HALF_UP）。注意不要用内置 round()——它是银行家舍入（round-half-even），500.5 会被舍成 500 而非 501，不满足 half-up 策略。改后 test_pricing.py::test_member_price_rounds_half_up（断言 PRODUCT-2/50% == 500）应通过。无需任何线上处置：服务指标正常，重启/扩容无法修复代码缺陷；回滚会整体撤掉会员价功能且属高风险，不采用。",
+        "confidence": 0.96,
+        "suspect_repo": "recommendation",
+        "suspect_commit_hint": "a3f6812",
+        "suspect_file_hint": "pricing.py (member_price_cents)",
+        "evidence": [
+          "deploys.log：2026-09-06 recommendation image=recommendation:a3f6812 note=member pricing rollout；告警 startsAt 2026-09-06 与该发版时间吻合，确认为发版引入的回归。",
+          "git show a3f6812（workspace/recommendation）：新增 pricing.py，member_price_cents() 计算 `discounted = base*(100-discount_pct)/100` 后 `return int(discounted)`，docstring 却写明 'rounded half-up'——int() 是向零截断，与 half-up 策略矛盾，即为根因。",
+          "git show HEAD:pricing.py（部署中的 HEAD f1beaa4）确认 member_price_cents() 仍为 `return int(discounted)`，bug 在当前线上代码中存在。",
+          "本地复算：PRODUCT-2 list=999 分，50% 折扣 → 999*(100-50)/100 = 499.5 分，int(499.5)=499，而 half-up 应为 500，正好差 1 分钱，与告警/QA 复现现象完全一致。",
+          "commit 自带回归测试 test_pricing.py::test_member_price_rounds_half_up 断言 member_price_cents('PRODUCT-2',50)==500，当前实现返回 499，测试会失败，佐证实现与既定策略不符。",
+          "docker ps 显示 recommendation 容器 Up 正常、无异常重启，符合告警所述‘服务指标正常’，排除资源/依赖类故障，锁定为纯代码逻辑 bug。"
+        ]
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "logs",
+        "kubectl_status",
+        "git_history"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ]
+}

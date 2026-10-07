@@ -1,0 +1,15 @@
+{
+  "alertname": "CartServiceUnavailable",
+  "service": "cart",
+  "labels": {
+    "service": "cart",
+    "severity": "critical",
+    "job": "cartservice"
+  },
+  "annotations": {
+    "summary": "cart 购物车服务对读写请求持续报错",
+    "description": "cart 服务对购物车的读写请求持续报错（cartFailure 开关被打开），加购/改数量/清空购物车全部失败，前端购物车页面基本不可用。cart 容器进程存活、无重启记录，近期无发版。请定位确认后给出处置建议。"
+  },
+  "startsAt": "2026-09-04T11:40:00Z",
+  "scenario_hint": "[v9增强/C1_早收敛] flag=cartFailure：单 flag、单服务、证据链清晰——验证「Skill → OFREP 查 flag → 1-2 步旁证 → 收敛，总步数 ≤8」的效率目标行为"
+}

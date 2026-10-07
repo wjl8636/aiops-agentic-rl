@@ -1,0 +1,19 @@
+{
+  "remediation_type": "online_op",
+  "suspect_service": "cart",
+  "expect_route": "feishu_online_op",
+  "expect_kind_any_of": [
+    "dependency",
+    "config"
+  ],
+  "expect_confidence_range": [
+    0.55,
+    0.95
+  ],
+  "expect_detail_contains_any": [
+    "人工",
+    "飞书",
+    "手动"
+  ],
+  "_family": "A3"
+}

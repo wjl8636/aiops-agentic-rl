@@ -1,0 +1,1 @@
+{"scenario": "s4", "route": "feishu_online_op", "service_ok": true, "kind_ok": false, "route_ok": false, "triggered_code_fix": true, "fix_verified": false, "changed_files_hit": true, "diag_latency_s": 243.599, "fix_latency_s": 35.438, "total_latency_s": 279.037, "pr_created": true, "run_index": 0, "ts": "2026-09-10T09:04:29+00:00"}

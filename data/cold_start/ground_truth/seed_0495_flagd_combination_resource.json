@@ -1,0 +1,9 @@
+{
+  "remediation_type": "online_op",
+  "suspect_service": "recommendation",
+  "expect_route": "feishu_online_op",
+  "expect_kind_any_of": [
+    "resource",
+    "config"
+  ]
+}

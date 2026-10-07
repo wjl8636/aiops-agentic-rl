@@ -1,0 +1,1 @@
+{"scenario": "s10_ranking", "route": "code_fix_pr", "service_ok": true, "kind_ok": false, "route_ok": true, "triggered_code_fix": true, "fix_verified": true, "changed_files_hit": false, "diag_latency_s": 402.213, "fix_latency_s": 59.265, "total_latency_s": 461.478, "pr_created": false, "run_index": 0, "ts": "2026-09-10T09:31:38+00:00"}

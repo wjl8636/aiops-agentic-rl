@@ -1,0 +1,17 @@
+# 本仓库分两类依赖：
+# 1) 下面这组是"数据构造 + reward 计算 + mock 烟雾测试 + 评测 harness"需要的，
+#    在没有 GPU 的机器上就能装、能跑，是本仓库实际验证过的范围。
+# 2) 真实 SFT/GRPO 训练与部署需要的 LLaMA-Factory / veRL / vllm / transformers[qwen3.5] /
+#    flash-attn / deepspeed 等大型框架依赖，只在租卡机器上装，见 docs/复现指南.md，
+#    不写进本文件（版本对 CUDA/驱动强耦合，写死在这里反而会误导）。
+
+pydantic>=2.0
+jsonschema>=4.0
+pytest>=7.0
+
+# 语义去重用的 BGE embedding；下载不了模型时 data/clean/dedup.py 会降级到
+# 轻量 hash 近似（见模块内 fallback 逻辑与 docs/复现指南.md 说明）
+sentence-transformers>=2.2
+
+# AIops-agent 子模块本身的依赖（只读消费其 SDK/校验逻辑时需要一起装）
+-r AIops-agent/requirements.txt

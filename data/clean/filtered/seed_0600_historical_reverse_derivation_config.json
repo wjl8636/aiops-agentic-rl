@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "shipping",
+  "labels": {
+    "service": "shipping",
+    "severity": "warning",
+    "job": "shippingservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0060-shipping-config",
+    "description": "shipping 依赖的内部服务证书轮换后，调用方信任链配置没有同步更新，导致运费查询间歇性握手失败，人工介入更新配置后恢复。"
+  },
+  "startsAt": "2026-07-20T19:15:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0060-shipping-config：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

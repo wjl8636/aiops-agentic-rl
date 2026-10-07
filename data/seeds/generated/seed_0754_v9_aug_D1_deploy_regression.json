@@ -1,0 +1,15 @@
+{
+  "alertname": "TrendingListStaleBeyondTtl",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "热门位配置更新后 /trending 长时间不刷新，60s TTL 形同虚设",
+    "description": "运营昨天更新了热门位配置，但 /trending 返回的热门列表超过 24 小时没有任何变化；按设计 60s 的 TTL 早就应该刷新多轮。初步排查确认配置下发链路正常、上游数据源正常。trending 缓存功能是最近合并进 master 上线的（deploys.log 有 trending cache rollout 记录），QA 在预发用短 TTL 条目复现：过了 TTL 仍能取到旧值，缓存条目疑似永不过期。服务指标正常，怀疑纯代码 bug。"
+  },
+  "startsAt": "2026-09-06T14:10:00Z",
+  "scenario_hint": "[v9增强/D1_新bug实例] suspect_file=cache.py：bug 在 GitHub 上游仓 master 的cache.py（与 flagd 无关，不注入开关）——Agent 读 workspace/recommendation 克隆（master）定位 bug，验证「code_fix + suspect_file_hint 命中新文件 + 不做任何线上操作」，证据拓扑与测评一致（读仓找 bug，不是本地 fixture）"
+}

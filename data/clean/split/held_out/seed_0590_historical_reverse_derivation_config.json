@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "frontend",
+  "labels": {
+    "service": "frontend",
+    "severity": "warning",
+    "job": "frontend"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0039-frontend-config",
+    "description": "frontend 首页图片加载耗时显著升高，排查确认该行为完全由一次功能开关配置变更触发，没有对应的代码发版，也没有下游依赖报错或资源占用异常，纯粹是配置项本身的取值问题，人工把开关改回原值后恢复。"
+  },
+  "startsAt": "2026-07-20T11:45:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0039-frontend-config：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

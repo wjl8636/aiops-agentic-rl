@@ -1,0 +1,29 @@
+{
+  "remediation_type": "online_op",
+  "suspect_service": "kafka",
+  "expect_route": "feishu_online_op",
+  "expect_kind_any_of": [
+    "resource",
+    "config"
+  ],
+  "expect_confidence_range": [
+    0.55,
+    0.95
+  ],
+  "expect_negative_claim": {
+    "object": "adHighCpu",
+    "markers": [
+      "未观测",
+      "未生效",
+      "不成立",
+      "无证据",
+      "未发现",
+      "未开启",
+      "未见",
+      "未命中",
+      "off",
+      "false"
+    ]
+  },
+  "_family": "A2"
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "DependencyFailureRate",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 依赖调用错误率上升",
+    "description": "recommendation 最近出现依赖调用异常：recommendation 服务的缓存层失效，具体表现是开关recommendationCacheFailure 生效后，上游对 recommendation 的请求持续失败或超时。观察窗口内没有发现相关代码发版记录，错误面集中在调用 recommendation 的链路上。"
+  },
+  "startsAt": "2026-07-02T15:00:00Z",
+  "scenario_hint": "[参数化扩增/dependency] flag=recommendationCacheFailure service=recommendation severity=critical：验证依赖故障场景在不同服务/severity/时间窗下的泛化"
+}

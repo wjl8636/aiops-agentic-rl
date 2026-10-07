@@ -1,0 +1,15 @@
+{
+  "alertname": "AdServiceGcPause",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "ad 服务出现明显的 GC 停顿",
+    "description": "ad 服务被强制触发完整的手动 GC（adManualGc 开关），GC 期间请求延迟出现明显毛刺，与持续型的高 CPU（adHighCpu）不同，这里是周期性的停顿而非持续打满。"
+  },
+  "startsAt": "2026-07-10T10:28:00Z",
+  "scenario_hint": "[flagd组合/单点] flag=adManualGc：单一 flagd 故障开关构造的resource 场景"
+}

@@ -1,0 +1,107 @@
+{
+  "alert": {
+    "alertname": "FrontendImageLoadSlowAfterLoadTestDrill",
+    "service": "frontend",
+    "labels": {
+      "service": "frontend",
+      "severity": "warning",
+      "job": "frontend"
+    },
+    "annotations": {
+      "summary": "大促前压测演练结束后 frontend 首页图片加载仍然缓慢",
+      "description": "运营团队昨晚组织了一次大促前的性能压测演练，其中一个环节需要人为让首页图片加载变慢以验证前端的加载中占位图效果，演练脚本通过 flagd 把 imageSlowLoad 开关打到最慢档位。演练结束后的收尾清单里没有包含\"把这个开关改回默认值\"这一步，导致演练结束、真实流量恢复后，首页图片依然按演练时的最慢档位加载。docker stats、Jaeger 调用链、deploys.log 均显示 frontend 服务本身健康、没有新发版，唯一异常来源是这个开关当前的取值。"
+    },
+    "startsAt": "2026-09-06T09:30:00Z",
+    "scenario_hint": "[历史工单反演/static] source_ticket=hist-2026-09-frontend-imageslowload-loadtest-drill flag=imageSlowLoad：2026-09 补充批次，手写历史工单摘要反向抽取的告警，显式标注 flag= 保证 fault_injection.py 按 flag=/flags= 精确路由（优先级高于 _inject_historical_fault() 的关键词兜底），不依赖脆弱的中文关键词猜测"
+  },
+  "alert_id": "seed_0709_historical_reverse_derivation_config",
+  "steps": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/imageSlowLoad' -H 'Content-Type: application/json' -d '{}'",
+        "description": "查询 flagd 中 imageSlowLoad 开关当前值"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"value\":10000,\"key\":\"imageSlowLoad\",\"reason\":\"STATIC\",\"variant\":\"10sec\",\"metadata\":{}}",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps --filter name=frontend --format '{{.Names}}\\t{{.Status}}'; echo '---'; docker inspect --format '{{.RestartCount}} {{.State.OOMKilled}}' frontend 2>/dev/null",
+        "description": "检查 frontend 容器状态与重启次数"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "frontend\tUp 2 weeks\n---\n0 false",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "大促前压测演练通过 flagd 把 imageSlowLoad 开关打到最慢档位（10000ms/\"10sec\"，STATIC 覆盖值），演练收尾未把开关改回默认档位；frontend 服务本身健康（容器已运行2周、RestartCount=0、未OOMKilled），与新发版/资源/依赖故障无关，根因是遗留的功能开关配置未回滚，导致真实流量恢复后首页图片仍按最慢档位加载。",
+        "kind": "config",
+        "suspect_service": "frontend",
+        "suspect_repo": null,
+        "suspect_commit_hint": null,
+        "suspect_file_hint": null,
+        "remediation_type": "online_op",
+        "also_code_fix": false,
+        "remediation_detail": "未自动执行止血：把 flagd 中 imageSlowLoad 从压测遗留值改回默认档位属于\"改功能开关配置\"操作，不在当前低风险白名单（仅 docker restart/compose recreate/docker update --cpus/--memory）覆盖范围内，命中即会被 hook 拦截，因此转交人工/运维处理。建议动作：通过 flagd 管理面或配置源将 imageSlowLoad 的 variant 从当前的 \"10sec\"（10000ms）重置为默认档位（如 \"off\"/\"instant\" 等演练前的默认值），并在演练 runbook 的收尾清单里补充\"复核并重置所有临时调整的 feature flag\"这一步，避免同类问题复发。frontend 容器自身无需重启/扩容/回滚，问题不在服务实例层面。",
+        "confidence": 0.95,
+        "evidence": [
+          "OFREP 实时查询 curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/imageSlowLoad' 返回 {\"value\":10000,\"key\":\"imageSlowLoad\",\"reason\":\"STATIC\",\"variant\":\"10sec\"} —— 确认该开关当前被静态覆盖为最慢档位(10秒延迟)，reason=STATIC 说明是人为固定值而非默认动态评估结果",
+          "docker ps 显示 frontend 容器 'Up 2 weeks'，docker inspect 显示 RestartCount=0、OOMKilled=false —— 排除容器崩溃/重启/OOM导致的性能问题",
+          "告警 annotations.description 中已说明 docker stats、Jaeger 调用链、deploys.log 均显示 frontend 服务健康、无新发版，与本次独立验证的容器健康状态一致，进一步排除资源/依赖/发版类根因",
+          "时间线吻合：昨晚压测演练通过 flagd 打开 imageSlowLoad 最慢档位用于验证前端加载占位图效果，演练收尾清单遗漏'开关复位'步骤，与今晨(2026-09-06 09:30 UTC)告警触发时间及现象(首页图片加载缓慢)完全对应"
+        ]
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "jaeger",
+        "logs",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ],
+  "final_diagnosis": {
+    "summary": "大促前压测演练通过 flagd 把 imageSlowLoad 开关打到最慢档位（10000ms/\"10sec\"，STATIC 覆盖值），演练收尾未把开关改回默认档位；frontend 服务本身健康（容器已运行2周、RestartCount=0、未OOMKilled），与新发版/资源/依赖故障无关，根因是遗留的功能开关配置未回滚，导致真实流量恢复后首页图片仍按最慢档位加载。",
+    "kind": "config",
+    "suspect_service": "frontend",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "online_op",
+    "remediation_detail": "未自动执行止血：把 flagd 中 imageSlowLoad 从压测遗留值改回默认档位属于\"改功能开关配置\"操作，不在当前低风险白名单（仅 docker restart/compose recreate/docker update --cpus/--memory）覆盖范围内，命中即会被 hook 拦截，因此转交人工/运维处理。建议动作：通过 flagd 管理面或配置源将 imageSlowLoad 的 variant 从当前的 \"10sec\"（10000ms）重置为默认档位（如 \"off\"/\"instant\" 等演练前的默认值），并在演练 runbook 的收尾清单里补充\"复核并重置所有临时调整的 feature flag\"这一步，避免同类问题复发。frontend 容器自身无需重启/扩容/回滚，问题不在服务实例层面。",
+    "confidence": 0.95,
+    "evidence": [
+      "OFREP 实时查询 curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/imageSlowLoad' 返回 {\"value\":10000,\"key\":\"imageSlowLoad\",\"reason\":\"STATIC\",\"variant\":\"10sec\"} —— 确认该开关当前被静态覆盖为最慢档位(10秒延迟)，reason=STATIC 说明是人为固定值而非默认动态评估结果",
+      "docker ps 显示 frontend 容器 'Up 2 weeks'，docker inspect 显示 RestartCount=0、OOMKilled=false —— 排除容器崩溃/重启/OOM导致的性能问题",
+      "告警 annotations.description 中已说明 docker stats、Jaeger 调用链、deploys.log 均显示 frontend 服务健康、无新发版，与本次独立验证的容器健康状态一致，进一步排除资源/依赖/发版类根因",
+      "时间线吻合：昨晚压测演练通过 flagd 打开 imageSlowLoad 最慢档位用于验证前端加载占位图效果，演练收尾清单遗漏'开关复位'步骤，与今晨(2026-09-06 09:30 UTC)告警触发时间及现象(首页图片加载缓慢)完全对应"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "feishu_online_op",
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"大促前压测演练通过 flagd 把 imageSlowLoad 开关打到最慢档位（10000ms/\\\"10sec\\\"，STATIC 覆盖值），演练收尾未把开关改回默认档位；frontend 服务本身健康（容器已运行2周、RestartCount=0、未OOMKilled），与新发版/资源/依赖故障无关，根因是遗留的功能开关配置未回滚，导致真实流量恢复后首页图片仍按最慢档位加载。\",\"kind\":\"config\",\"suspect_service\":\"frontend\",\"suspect_repo\":null,\"suspect_commit_hint\":null,\"suspect_file_hint\":null,\"remediation_type\":\"online_op\",\"also_code_fix\":false,\"remediation_detail\":\"未自动执行止血：把 flagd 中 imageSlowLoad 从压测遗留值改回默认档位属于\\\"改功能开关配置\\\"操作，不在当前低风险白名单（仅 docker restart/compose recreate/docker update --cpus/--memory）覆盖范围内，命中即会被 hook 拦截，因此转交人工/运维处理。建议动作：通过 flagd 管理面或配置源将 imageSlowLoad 的 variant 从当前的 \\\"10sec\\\"（10000ms）重置为默认档位（如 \\\"off\\\"/\\\"instant\\\" 等演练前的默认值），并在演练 runbook 的收尾清单里补充\\\"复核并重置所有临时调整的 feature flag\\\"这一步，避免同类问题复发。frontend 容器自身无需重启/扩容/回滚，问题不在服务实例层面。\",\"confidence\":0.95,\"evidence\":[\"OFREP 实时查询 curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/imageSlowLoad' 返回 {\\\"value\\\":10000,\\\"key\\\":\\\"imageSlowLoad\\\",\\\"reason\\\":\\\"STATIC\\\",\\\"variant\\\":\\\"10sec\\\"} —— 确认该开关当前被静态覆盖为最慢档位(10秒延迟)，reason=STATIC 说明是人为固定值而非默认动态评估结果\",\"docker ps 显示 frontend 容器 'Up 2 weeks'，docker inspect 显示 RestartCount=0、OOMKilled=false —— 排除容器崩溃/重启/OOM导致的性能问题\",\"告警 annotations.description 中已说明 docker stats、Jaeger 调用链、deploys.log 均显示 frontend 服务健康、无新发版，与本次独立验证的容器健康状态一致，进一步排除资源/依赖/发版类根因\",\"时间线吻合：昨晚压测演练通过 flagd 打开 imageSlowLoad 最慢档位用于验证前端加载占位图效果，演练收尾清单遗漏'开关复位'步骤，与今晨(2026-09-06 09:30 UTC)告警触发时间及现象(首页图片加载缓慢)完全对应\"]}"
+  }
+}

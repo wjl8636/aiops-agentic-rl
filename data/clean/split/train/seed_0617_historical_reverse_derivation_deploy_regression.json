@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0040-recommendation-deploy_regression",
+    "description": "recommendation 容器（镜像 f18f452，deploys.log 标记为 LATEST_DEPLOY suspect，替换 baseline ac26792）内存单调上升趋向 OOM。源码 scripts/fixtures/recommendation/recommendation_server.py 中模块级 _seen_product_ids: list（第31行）在 get_recommendations 每次调用被无界 extend（第44行）、从未裁剪，持续负载下工作集内存无上限增长。已通过容器自身 /metrics 实时验证：重启前 recommendation_seen_ids_total=703590，对应内存 121.8MiB/128MiB(95.16%)，已逼近 OOM。已执行低风险止血（docker restart），重启后内存降至 14.32MiB(11.19%)、计数器重置，但同一镜像下泄漏逻辑仍在，负载持续则会再次爬升复发，需代码根治。"
+  },
+  "startsAt": "2026-07-21T08:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0040-recommendation-deploy_regression：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

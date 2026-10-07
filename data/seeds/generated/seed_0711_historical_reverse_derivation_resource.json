@@ -1,0 +1,15 @@
+{
+  "alertname": "KafkaInventoryConsumerReconnectStorm",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "critical",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "inventory-sync 主题消费者组反复重连，消费吞吐骤降",
+    "description": "网络团队记录到 broker 与 inventory-consumer 消费者组之间的网络链路在过去半小时里出现间歇性抖动，消费者客户端反复触发重连和分区重新分配，每次重连期间都会短暂停止消费，inventory-sync 主题的 consumer lag 持续攀升，库存同步明显滞后。生产端发送速率在此期间没有变化，问题根源是网络链路抖动导致的消费端重连风暴，不是代码或容量配置问题。"
+  },
+  "startsAt": "2026-09-06T10:30:00Z",
+  "scenario_hint": "[历史工单反演/static] source_ticket=hist-2026-09-inventory-consumer-network-flap flag=kafkaQueueProblems：2026-09 补充批次，手写历史工单摘要反向抽取的告警，显式标注 flag= 保证 fault_injection.py 按 flag=/flags= 精确路由（优先级高于 _inject_historical_fault() 的关键词兜底），不依赖脆弱的中文关键词猜测"
+}

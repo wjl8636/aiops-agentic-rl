@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "product-catalog",
+  "labels": {
+    "service": "product-catalog",
+    "severity": "warning",
+    "job": "product-catalog"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0062-product-catalog-dependency",
+    "description": "告警描述与 scenario_hint 明确指向：flagd 功能开关 productCatalogFailure 被打开，导致 product-catalog 的 GetProduct 接口对上游 frontend/recommendation 的调用大量 5xx——属于\"自身被开关人为致障\"的依赖型故障。但当前沙箱环境未部署 product-catalog 容器、Prometheus 无该服务的采集目标（up 查询为空）、Jaeger API 仅返回 UI 静态页无法拉取该服务的失败 trace，因此无法用实时指标/调用链交叉验证 5xx 飙升与具体故障跳数；本地 flagd 配置文件（vendor/otel-demo/src/flagd/demo.flagd.json）里该 flag 当前 defaultVariant 为 \"off\"，与告警所述\"开关刚被打开\"的实时状态不一致，说明此环境只是复现告警文本场景，并非真实故障现场。结论以告警自身描述为主要依据，未获得独立实时证据佐证，置信度下调。且 product-catalog 不在本 Agent 低风险自动处置的授权目标清单内，回退 flagd 开关也不属于 restart_instance/migrate_instance/scale_resources 三类白名单动作形态，因此未执行任何自动处置，建议交人工在 flagd/配置中心将 productCatalogFailure 改回 off 并观察 frontend/recommendation 侧调用成功率恢复。"
+  },
+  "startsAt": "2026-07-20T20:45:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0062-product-catalog-dependency：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

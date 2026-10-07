@@ -1,0 +1,15 @@
+{
+  "alertname": "DependencyFailureRate",
+  "service": "payment",
+  "labels": {
+    "service": "payment",
+    "severity": "critical",
+    "job": "paymentservice"
+  },
+  "annotations": {
+    "summary": "payment 依赖调用错误率上升",
+    "description": "payment 最近出现依赖调用异常：payment 服务按比例拒绝扣款请求，具体表现是开关paymentFailure 生效后，上游对 payment 的请求持续失败或超时。观察窗口内没有发现相关代码发版记录，错误面集中在调用 payment 的链路上。"
+  },
+  "startsAt": "2026-07-02T21:45:00Z",
+  "scenario_hint": "[参数化扩增/dependency] flag=paymentFailure service=payment severity=critical：验证依赖故障场景在不同服务/severity/时间窗下的泛化"
+}

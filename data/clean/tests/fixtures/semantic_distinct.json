@@ -1,0 +1,15 @@
+{
+  "alertname": "RecommendationRankingRegressionDistinct",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 排序结果出现明显回归",
+    "description": "最近一次发版之后 recommendation 的排序质量明显下降，怀疑 feature/ranking 分支的 ranking.py 里排序方向写反了，属于纯代码问题。"
+  },
+  "startsAt": "2026-06-20T10:10:00Z",
+  "scenario_hint": "发版引入的代码回归"
+}

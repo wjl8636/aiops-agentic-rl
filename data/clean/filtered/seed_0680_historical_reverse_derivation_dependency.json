@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "cart",
+  "labels": {
+    "service": "cart",
+    "severity": "critical",
+    "job": "cartservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：hist-2025-08-cart-batch-query-timeout",
+    "description": "2025-08 的一次事故：cart 团队上线了一个购物车对账批处理脚本，脚本里的下游查询同样忘记设超时，占满 cart 的处理线程池，checkout 调用 cart 接口大面积超时。"
+  },
+  "startsAt": "2026-07-23T07:15:00Z",
+  "scenario_hint": "[历史工单反演/static] source_ticket=hist-2025-08-cart-batch-query-timeout：从手写历史工单摘要样例反向抽取的告警（Milvus 检索池不足时的静态兜底）"
+}

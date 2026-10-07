@@ -1,0 +1,15 @@
+{
+  "alertname": "MemoryLeakOOM",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 服务内存持续上涨、趋向 OOM",
+    "description": "recommendation（Python/gRPC）容器的工作集内存在负载下单调上升，重启次数不断增加（被 OOMKilled）。问题从最近一次发版之后立刻开始，怀疑是最近一次发版引入的某个 commit 里，对一个全局/请求级的 list 做了 append 但从未清理或做长度上限控制，随着请求量增加持续增长，最终把工作集内存吃满。"
+  },
+  "startsAt": "2026-07-05T09:45:00Z",
+  "scenario_hint": "[参数化扩增/deploy_regression] 泄漏机制=无界 list append（unbounded_list_append）：内存泄漏 capstone 的泄漏点变体，对应 scripts/fixtures/recommendation 的不同 fixture 版本"
+}

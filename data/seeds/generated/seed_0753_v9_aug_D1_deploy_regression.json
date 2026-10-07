@@ -1,0 +1,15 @@
+{
+  "alertname": "CatalogPaginationSkipsHead",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "接入方按页遍历目录会漏内容，从 page=0 开始才能拿到完整目录",
+    "description": "商品数据接入方反馈：按 page=1,2,3… 顺序遍历 /catalog 分页接口会跳过目录最前面的商品，对账永远差头部那几条；有接入方临时改从 page=0 开始遍历才能拿全（但 page=0 对 1-based 语义是非法参数）。分页功能最近合并进 master 上线（deploys.log 有对应发版记录），上线前接入方联调时未覆盖到首页边界。服务自身指标全部正常，怀疑纯代码bug，重启无效。"
+  },
+  "startsAt": "2026-09-06T11:30:00Z",
+  "scenario_hint": "[v9增强/D1_新bug实例] suspect_file=pagination.py：bug 在 GitHub 上游仓 master 的pagination.py（与 flagd 无关，不注入开关）——Agent 读 workspace/recommendation 克隆（master）定位 bug，验证「code_fix + suspect_file_hint 命中新文件 + 不做任何线上操作」，证据拓扑与测评一致（读仓找 bug，不是本地 fixture）"
+}

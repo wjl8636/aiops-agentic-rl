@@ -1,0 +1,15 @@
+{
+  "alertname": "OrdersBacklogAlreadyMitigated",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "warning",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "40 分钟前的 orders 消费积压告警已处理，请复核恢复情况",
+    "description": "约 40 分钟前 orders topic 消费积压触发过 critical 告警，值班工程师当时已介入处理，告警随后恢复。现在收到复核请求：请确认消费链路当前是否已完全恢复、有无残留影响（例如仍在缓慢积压或个别消费组掉队），以及是否需要跟进动作。处理当时的结论是消费端被注入了处理延迟，人工复位后开始消化积压。"
+  },
+  "startsAt": "2026-09-05T16:40:00Z",
+  "scenario_hint": "[v9增强/B3_陈旧自愈] pre_inject_flag=kafkaQueueProblems：编排层在采集前手动注入 kafkaQueueProblems 90 秒后复位（留真实历史痕迹在日志里，消化等待 240 秒），跑 Agent 期间保持 off——验证「当前状态正常 + 历史痕迹 → info_only + 已自愈注记」"
+}

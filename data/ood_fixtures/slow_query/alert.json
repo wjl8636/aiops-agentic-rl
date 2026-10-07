@@ -1,0 +1,15 @@
+{
+  "alertname": "DatabaseSlowQueryLatencySpike",
+  "service": "product-catalog",
+  "labels": {
+    "service": "product-catalog",
+    "severity": "warning",
+    "job": "product-catalog"
+  },
+  "annotations": {
+    "summary": "product-catalog 的 GetProduct 接口 p99 延迟飙升，但错误率和 CPU/内存均正常",
+    "description": "product-catalog 的 GetProduct 接口 p99 延迟从平时的几十毫秒升高到数秒，但 HTTP/gRPC 错误率没有明显上升、服务自身 CPU/内存也在正常范围，请求量没有明显变化。怀疑瓶颈在数据库这一层：最近一次发版给某个按商品分类过滤的查询新增了一个过滤条件，但没有配套建索引，该查询在数据量较大的分类上变成全表扫描，数据库连接池里堆积了大量等待中的慢查询连接，间接拖慢了同一连接池上的其它查询。没有 flagd 开关变更。"
+  },
+  "startsAt": "2026-08-27T11:00:00Z",
+  "scenario_hint": "OOD/慢查询：不在现有 4 类 Kind 枚举里的新故障类型，这里借用 kind=\"resource\" 近似表达（表现为连接池/数据库资源被慢查询占满），但实际根因是缺索引的查询模式，诊断动作应落在 EXPLAIN 执行计划和慢查询日志而不是常规 CPU/内存曲线——设计张力见 data/ood_fixtures/slow_query/README.md。"
+}

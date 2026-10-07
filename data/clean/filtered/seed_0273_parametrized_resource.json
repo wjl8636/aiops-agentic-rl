@@ -1,0 +1,15 @@
+{
+  "alertname": "KafkaConsumerLag",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "warning",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "Kafka 消费组 shipping-consumer 在 shipping-updates 上的积压持续增长",
+    "description": "shipping-updates topic 的消费 lag 单调上升，当前约 15300 条消息未消费（kafkaQueueProblems）。生产速率超过消费速率；消费者 shipping-consumer 本身健康，但算力配置不足以匹配当前生产吞吐。"
+  },
+  "startsAt": "2026-07-06T00:00:00Z",
+  "scenario_hint": "[参数化扩增/queue_backlog] topic=shipping-updates lag=15300 severity=warning：验证队列积压场景在不同 topic/lag 规模下的泛化"
+}

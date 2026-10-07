@@ -1,0 +1,15 @@
+{
+  "alertname": "MemoryLeakOOM",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 服务内存持续上涨、趋向 OOM",
+    "description": "观察到 recommendation（Python/gRPC）在负载下内存不断攀升，最终触发 OOM 被强制重启，且重启频率还在增加。这个趋势是从最新一次发版开始出现的，怀疑是最近一次发版引入的某个 commit 里打开了日志/临时文件后没有用 with 语句正确关闭（或者异常路径遗漏了 close），文件句柄和内部缓冲区随请求量持续堆积。"
+  },
+  "startsAt": "2026-07-04T10:30:00Z",
+  "scenario_hint": "[参数化扩增/deploy_regression] 泄漏机制=未关闭的文件句柄（unclosed_file_handle）：内存泄漏 capstone 的泄漏点变体，对应 scripts/fixtures/recommendation 的不同 fixture 版本"
+}

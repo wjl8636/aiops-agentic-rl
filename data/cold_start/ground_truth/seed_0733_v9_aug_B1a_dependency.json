@@ -1,0 +1,40 @@
+{
+  "_family": "B1b",
+  "_note": "B1a→B1b 降级（方案 §4.2 既定机制）：adFailure 为死亡机制（开关可验但服务实际无恙），症状不可确证；三轮实测 r1 conf=0.5、r2 info_only、r3 conf=0.55 全部无法确认症状存在，教师稳定走诚实低置信。降级为 B1b 型 GT（低置信降级目标）。",
+  "remediation_type": "online_op",
+  "expect_remediation_any_of": [
+    "online_op",
+    "info_only"
+  ],
+  "suspect_service": "ad",
+  "expect_route": "feishu_low_confidence",
+  "expect_kind_any_of": [
+    "config",
+    "dependency",
+    "resource"
+  ],
+  "expect_confidence_range": [
+    0.0,
+    0.6
+  ],
+  "expect_negative_claim": {
+    "object": null,
+    "markers": [
+      "未能定位",
+      "未找到",
+      "无法确认",
+      "无法定位",
+      "证据不足",
+      "未观测到",
+      "无法排除",
+      "不能确认",
+      "未能确认",
+      "无法确定",
+      "无法复现",
+      "矛盾",
+      "未能证实",
+      "未真正",
+      "存疑"
+    ]
+  }
+}

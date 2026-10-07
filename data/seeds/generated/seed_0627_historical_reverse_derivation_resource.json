@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0053-recommendation-resource",
+    "description": "recommendation 服务在最新发版 (image/sha=e482193, deploys.log 标记 LATEST_DEPLOY suspect，替换 baseline f8a6666) 后出现内存单调上升并反复被 OOM/重启 (RestartCount=9, 内存上限 128MB)。根因是 recommendation_server.py 中模块级列表 _seen_product_ids 在每次 get_recommendations 被无界 extend 且从不裁剪，持续负载下工作集内存无上限增长直至 OOM。可先回滚到 baseline 镜像 f8a6666 止血，但彻底修复需改代码（对该缓存加界，如 collections.deque(maxlen=N) 或移除该累积）。"
+  },
+  "startsAt": "2026-07-21T15:30:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0053-recommendation-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "TlsCertificateExpiringSoon",
+  "service": "checkout",
+  "labels": {
+    "service": "checkout",
+    "severity": "critical",
+    "job": "checkoutservice"
+  },
+  "annotations": {
+    "summary": "checkout 调用 payment 网关的 TLS 证书即将过期，部分请求已开始握手失败",
+    "description": "checkout 服务在调用 payment 网关时，部分请求出现 TLS 握手失败（x509: certificate has expired or is not yet valid）。证书监控显示 payment 网关对外证书将在 6 小时内到期，当前已有约 3% 的请求命中过期窗口附近的时钟偏差触发失败，比例随时间推移会持续上升直至证书完全过期后请求 100% 失败。没有代码发版，也没有 flagd 开关变更，指标层面 CPU/内存/QPS 均正常，问题看起来集中在证书链本身。"
+  },
+  "startsAt": "2026-08-25T02:00:00Z",
+  "scenario_hint": "OOD/TLS 证书过期：不在现有 4 类 Kind 枚举里的新故障类型，这里借用 kind=\"config\"（证书轮换属于配置/凭据类问题，不是代码回归也不是资源耗尽或普通依赖调用失败）近似表达——设计张力见 data/ood_fixtures/tls_cert_expiry/README.md 里的说明，不代表 Diagnosis.kind 枚举已经能准确刻画这类故障。"
+}

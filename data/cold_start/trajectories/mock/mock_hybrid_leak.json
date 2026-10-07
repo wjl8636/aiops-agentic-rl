@@ -1,0 +1,122 @@
+{
+  "alert": {
+    "alertname": "MockRecommendationMemoryLeak",
+    "service": "recommendation",
+    "labels": {
+      "service": "recommendation",
+      "severity": "critical",
+      "job": "recommendation"
+    },
+    "annotations": {
+      "summary": "recommendation 内存单调上升且需先止血再改代码根治",
+      "description": "recommendation 容器内存持续上涨、OOMKilled 次数飙升，怀疑最近一次发版引入了无界缓存；业务要求先扩容/重启止血，再触发代码修复 Agent 提 PR 根治。"
+    },
+    "startsAt": "2026-06-20T12:00:00Z"
+  },
+  "alert_id": "mock_hybrid_leak",
+  "steps": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker stats --no-stream recommendation"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "recommendation   MEM 940MiB / 1024MiB（持续上涨）",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git -C /repo/recommendation log --oneline -5"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "abc1234 feat: cache popular items in-memory for latency\nd4e5f67 chore: bump grpc\n...",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git -C /repo/recommendation show abc1234 --stat"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "abc1234 修改 src/recommendation_server.py：新增全局 dict `_POPULAR_CACHE`，无过期/无容量上限，每次请求都会写入新 key。",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs --tail 30 recommendation"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "OOMKilled 事件 x3（过去 1 小时），MemoryError: cannot allocate memory",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker restart recommendation"
+      },
+      "hook_decision": "allow",
+      "hook_action": "restart_instance",
+      "hook_target": "recommendation",
+      "observation": "recommendation 已重启，内存回落到 120MiB。",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    }
+  ],
+  "final_diagnosis": {
+    "summary": "commit abc1234 引入的无界内存缓存导致 OOM，已重启止血，需代码修复根治。",
+    "kind": "deploy_regression",
+    "suspect_service": "recommendation",
+    "suspect_repo": "recommendation",
+    "suspect_commit_hint": "abc1234",
+    "suspect_file_hint": "src/recommendation_server.py",
+    "remediation_type": "online_op",
+    "remediation_detail": "已滚动重启 recommendation 清空内存，同时需要修复 abc1234 引入的无界缓存。",
+    "confidence": 0.9,
+    "evidence": [
+      "docker stats 显示 recommendation 内存持续上涨至 940MiB/1024MiB",
+      "git show abc1234 显示新增无过期/无容量上限的全局 dict 缓存",
+      "docker logs 显示过去 1 小时 OOMKilled 事件 x3"
+    ],
+    "time_window": null,
+    "also_code_fix": true,
+    "executed_actions": [
+      {
+        "action": "restart_instance",
+        "target": "recommendation",
+        "command": "docker restart recommendation",
+        "ts": "2026-06-20T00:00:00Z"
+      }
+    ]
+  },
+  "ground_truth": null,
+  "route": "auto_remediated_and_code_fix_pr",
+  "post_action_health": {
+    "checked": true,
+    "healthy": true,
+    "metric": "container_memory_usage_bytes",
+    "window_s": 60
+  },
+  "meta": {
+    "source": "mock",
+    "degraded": null,
+    "raw": null
+  }
+}

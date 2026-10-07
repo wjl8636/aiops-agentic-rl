@@ -1,0 +1,15 @@
+{
+  "alertname": "ImageSlowLoadDrillCleanupVerify",
+  "service": "frontend",
+  "labels": {
+    "service": "frontend",
+    "severity": "info",
+    "job": "frontend"
+  },
+  "annotations": {
+    "summary": "昨晚压测用的图片限速开关已确认复位，今晨仍有零星反馈请核实",
+    "description": "昨晚性能压测演练曾把首页图片加载限速开关（imageSlowLoad）打到慢速档位，演练结束后值班确认已复位。今晨客服仍有 2 例「图片加载慢」的零星反馈，请核实当前开关状态与图片加载链路是否已完全恢复正常，确认无残留问题后即可关闭本单。"
+  },
+  "startsAt": "2026-09-05T21:35:00Z",
+  "scenario_hint": "[v9增强/B3_陈旧自愈] pre_inject_flag=none：纯叙事型陈旧告警（无真实历史痕迹），不注入任何故障——验证「当前状态正常 + 历史痕迹 → info_only + 已自愈注记」"
+}

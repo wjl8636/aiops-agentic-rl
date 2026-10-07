@@ -1,0 +1,36 @@
+{
+  "remediation_type": "info_only",
+  "suspect_service": "quote",
+  "expect_route": "info_only",
+  "expect_kind_any_of": [
+    "dependency",
+    "deploy_regression",
+    "config"
+  ],
+  "expect_confidence_range": [
+    0.5,
+    0.85
+  ],
+  "expect_max_steps": 12,
+  "expect_negative_claim": {
+    "object": null,
+    "markers": [
+      "无活跃",
+      "噪声",
+      "误报",
+      "误传",
+      "未发现",
+      "未观测",
+      "无异常",
+      "已排除",
+      "非真实故障",
+      "不成立",
+      "证伪",
+      "无需处置",
+      "已不再",
+      "不再复现",
+      "已停止"
+    ]
+  },
+  "_family": "A1"
+}

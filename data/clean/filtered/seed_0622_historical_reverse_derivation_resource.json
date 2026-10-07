@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "checkout",
+  "labels": {
+    "service": "checkout",
+    "severity": "warning",
+    "job": "checkoutservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0011-checkout-resource",
+    "description": "checkout 的重试策略配置被调得过于激进（更短的重试间隔、更多的重试次数），CPU 使用率持续处于高位，没有伴随代码发版。"
+  },
+  "startsAt": "2026-07-21T11:45:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0011-checkout-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "FrontendImageLoadSlowAfterLoadTestDrill",
+  "service": "frontend",
+  "labels": {
+    "service": "frontend",
+    "severity": "warning",
+    "job": "frontend"
+  },
+  "annotations": {
+    "summary": "大促前压测演练结束后 frontend 首页图片加载仍然缓慢",
+    "description": "运营团队昨晚组织了一次大促前的性能压测演练，其中一个环节需要人为让首页图片加载变慢以验证前端的加载中占位图效果，演练脚本通过 flagd 把 imageSlowLoad 开关打到最慢档位。演练结束后的收尾清单里没有包含\"把这个开关改回默认值\"这一步，导致演练结束、真实流量恢复后，首页图片依然按演练时的最慢档位加载。docker stats、Jaeger 调用链、deploys.log 均显示 frontend 服务本身健康、没有新发版，唯一异常来源是这个开关当前的取值。"
+  },
+  "startsAt": "2026-09-06T09:30:00Z",
+  "scenario_hint": "[历史工单反演/static] source_ticket=hist-2026-09-frontend-imageslowload-loadtest-drill flag=imageSlowLoad：2026-09 补充批次，手写历史工单摘要反向抽取的告警，显式标注 flag= 保证 fault_injection.py 按 flag=/flags= 精确路由（优先级高于 _inject_historical_fault() 的关键词兜底），不依赖脆弱的中文关键词猜测"
+}

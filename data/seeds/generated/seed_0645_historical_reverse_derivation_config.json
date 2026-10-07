@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0022-ad-config",
+    "description": "ad 服务依赖的一个内部网关证书轮换后，调用方配置的信任链没有同步更新，导致广告请求间歇性握手失败，frontend 首页偶发广告位超时，人工介入更新配置后恢复。"
+  },
+  "startsAt": "2026-07-22T05:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0022-ad-config：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

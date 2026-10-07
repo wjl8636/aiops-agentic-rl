@@ -1,0 +1,15 @@
+{
+  "alertname": "DependencyFailureRate",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "ad 依赖调用错误率上升",
+    "description": "一次功能开关变更（adFailure）之后，ad（ad 服务整体失败）开始对上游调用方返回失败/超时。上游服务的请求成功率随之下降，错误集中出现在依赖 ad 的那部分调用路径上，没有伴随代码发版。"
+  },
+  "startsAt": "2026-07-02T07:30:00Z",
+  "scenario_hint": "[参数化扩增/dependency] flag=adFailure service=ad severity=warning：验证依赖故障场景在不同服务/severity/时间窗下的泛化"
+}

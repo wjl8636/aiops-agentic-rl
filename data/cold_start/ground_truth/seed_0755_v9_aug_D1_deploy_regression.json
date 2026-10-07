@@ -1,0 +1,17 @@
+{
+  "remediation_type": "code_fix",
+  "suspect_service": "recommendation",
+  "expect_route": "code_fix_pr",
+  "expect_kind_any_of": [
+    "deploy_regression"
+  ],
+  "expect_confidence_range": [
+    0.6,
+    0.98
+  ],
+  "expect_suspect_file_any_of": [
+    "pricing.py",
+    "src/pricing.py"
+  ],
+  "_family": "D1"
+}

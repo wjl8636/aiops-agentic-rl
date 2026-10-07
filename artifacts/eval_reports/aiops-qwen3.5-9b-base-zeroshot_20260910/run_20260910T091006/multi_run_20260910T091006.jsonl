@@ -1,0 +1,1 @@
+{"scenario": "s7_hybrid", "route": "auto_remediated_and_code_fix_pr", "service_ok": true, "kind_ok": false, "route_ok": true, "triggered_code_fix": true, "fix_verified": true, "changed_files_hit": false, "diag_latency_s": 83.811, "fix_latency_s": 90.01, "total_latency_s": 173.821, "pr_created": true, "run_index": 0, "ts": "2026-09-10T09:13:05+00:00"}

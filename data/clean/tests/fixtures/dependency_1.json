@@ -1,0 +1,15 @@
+{
+  "alertname": "HighErrorRate",
+  "service": "product-catalog",
+  "labels": {
+    "service": "product-catalog",
+    "severity": "critical",
+    "job": "product-catalog"
+  },
+  "annotations": {
+    "summary": "product-catalog 的 GetProduct 接口 5xx 错误率飙升",
+    "description": "一次功能开关变更（productCatalogFailure）之后，product-catalog 的错误率突然跳升，上游调用方大量失败。"
+  },
+  "startsAt": "2026-06-20T10:00:00Z",
+  "scenario_hint": "flagd 开关引发的依赖故障"
+}

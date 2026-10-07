@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0029-ad-resource",
+    "description": "ad service CPU 飙高，流量驱动，建议扩容"
+  },
+  "startsAt": "2026-07-22T02:45:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0029-ad-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

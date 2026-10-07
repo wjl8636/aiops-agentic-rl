@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "frontend",
+  "labels": {
+    "service": "frontend",
+    "severity": "critical",
+    "job": "frontend"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0027-frontend-resource",
+    "description": "frontend 的一次运行时参数配置变更间接改变了内部缓存清理频率，变更后 CPU 使用率持续处于高位，页面响应 p99 明显上升，没有伴随代码发版。"
+  },
+  "startsAt": "2026-07-22T05:45:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0027-frontend-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

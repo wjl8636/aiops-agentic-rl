@@ -1,0 +1,15 @@
+{
+  "alertname": "DependencyFailureRate",
+  "service": "cart",
+  "labels": {
+    "service": "cart",
+    "severity": "warning",
+    "job": "cartservice"
+  },
+  "annotations": {
+    "summary": "cart 依赖调用错误率上升",
+    "description": "cart 最近出现依赖调用异常：cart 服务失败，具体表现是开关cartFailure 生效后，上游对 cart 的请求持续失败或超时。观察窗口内没有发现相关代码发版记录，错误面集中在调用 cart 的链路上。"
+  },
+  "startsAt": "2026-07-01T23:15:00Z",
+  "scenario_hint": "[参数化扩增/dependency] flag=cartFailure service=cart severity=warning：验证依赖故障场景在不同服务/severity/时间窗下的泛化"
+}

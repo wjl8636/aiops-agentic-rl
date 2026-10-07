@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "checkout",
+  "labels": {
+    "service": "checkout",
+    "severity": "critical",
+    "job": "checkoutservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0056-checkout-deploy_regression",
+    "description": "checkout 服务内存占用最近持续走高，容器重启次数增加。时间线上正好卡在最近一次发版之后，怀疑是最近一次发版引入的某个 commit 里错误使用了 WeakSet/WeakValueDictionary（例如外部仍持有强引用，或者存进去的对象类型本身不支持被弱引用而退化成强引用），本该被回收的对象实际从未被回收。"
+  },
+  "startsAt": "2026-07-21T19:15:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0056-checkout-deploy_regression：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

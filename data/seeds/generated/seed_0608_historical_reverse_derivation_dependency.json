@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "frontend",
+  "labels": {
+    "service": "frontend",
+    "severity": "warning",
+    "job": "frontend"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0007-frontend-dependency",
+    "description": "frontend 首页需要同时聚合 product-catalog 的商品列表和 recommendation 的推荐结果，其中对 product-catalog 那一路调用没有配超时；product-catalog 偶发性变慢时，frontend 的页面渲染请求被这一条慢腿拖住，首页整体超时。"
+  },
+  "startsAt": "2026-07-21T01:15:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0007-frontend-dependency：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

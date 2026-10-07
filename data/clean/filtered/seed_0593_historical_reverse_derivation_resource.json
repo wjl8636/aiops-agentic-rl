@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0032-ad-resource",
+    "description": "告警描述 ad 服务因 flagd 开关 adServiceHighCpu(实际 flag 名 adHighCpu) 打开导致 CPU 打满、p99 攀升，但当前实时观测与描述完全矛盾：flagd 配置 adHighCpu.defaultVariant 当前为 off；jvm_cpu_recent_utilization_ratio{job=\"opentelemetry-demo/ad\"}=0.00059 近乎空载；docker stats 显示 ad 容器 CPU 仅 0.15%，内存正常；demo_ad_requests_total 请求率为 0，无流量；p99 延迟查询为空。告警 startsAt=2026-06-20 与当前(2026-08-18)、与容器 StartedAt=2026-08-17T15:50(RestartCount=0, OOMKilled=false) 相差近两个月，说明当前运行实例与告警触发时并非同一次运行。历史相似工单(4条,相似度0.65~0.77)均得出一致结论：陈旧/失效告警或故障注入未实际生效，无需处置。综合判断本次告警不代表当前存在活跃的 CPU 饱和问题，未执行任何自动处置。"
+  },
+  "startsAt": "2026-07-20T14:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0032-ad-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

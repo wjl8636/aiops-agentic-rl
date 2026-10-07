@@ -1,0 +1,15 @@
+{
+  "alertname": "MemberPriceOffByOneCent",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "会员价在 0.5 分边界上差一分钱，应四舍五入实际被舍掉",
+    "description": "财务对账发现会员价展示与应付金额在 0.5 分边界上偶发差 1 分钱：例如 PRODUCT-2 按 50%折扣应为 499.5 分，按展示口径四舍五入应为 500 分，实际展示/返回 499 分。会员价功能是最近合并进 master 上线的（deploys.log 有 member pricing rollout 记录），QA 在预发稳定复现：所有落在 .5 分边界的折扣价一律少了 1 分。金额相关的问题需要尽快修，服务指标正常，怀疑纯代码 bug。"
+  },
+  "startsAt": "2026-09-06T16:45:00Z",
+  "scenario_hint": "[v9增强/D1_新bug实例] suspect_file=pricing.py：bug 在 GitHub 上游仓 master 的pricing.py（与 flagd 无关，不注入开关）——Agent 读 workspace/recommendation 克隆（master）定位 bug，验证「code_fix + suspect_file_hint 命中新文件 + 不做任何线上操作」，证据拓扑与测评一致（读仓找 bug，不是本地 fixture）"
+}

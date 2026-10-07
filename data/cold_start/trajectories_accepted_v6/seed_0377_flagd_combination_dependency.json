@@ -1,0 +1,320 @@
+{
+  "alert": {
+    "alertname": "AdServiceFailure",
+    "service": "ad",
+    "labels": {
+      "service": "ad",
+      "severity": "warning",
+      "job": "adservice"
+    },
+    "annotations": {
+      "summary": "ad 服务整体请求失败",
+      "description": "ad 服务对广告请求整体返回失败（adFailure 开关），上游 frontend 调用 ad 接口大量报错，ad 服务自身 CPU/内存均在正常范围，判断是功能开关级故障而非资源问题。"
+    },
+    "startsAt": "2026-07-10T10:14:00Z",
+    "scenario_hint": "[flagd组合/单点] flag=adFailure：单一 flagd 故障开关构造的dependency 场景"
+  },
+  "alert_id": "seed_0377_flagd_combination_dependency",
+  "steps": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/adFailure' -H 'Content-Type: application/json' -d '{}'",
+        "description": "查询 flagd 中 adFailure 开关的实时值"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"value\":true,\"key\":\"adFailure\",\"reason\":\"STATIC\",\"variant\":\"on\",\"metadata\":{}}",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s 'http://localhost:16686/jaeger/ui/api/services'",
+        "description": "查看 Jaeger 中已知服务列表"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"data\":[\"recommendation\",\"ad\",\"jaeger-all-in-one\",\"fraud-detection\",\"load-generator\",\"flagd\"],\"total\":6,\"limit\":0,\"offset\":0,\"errors\":null}",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps --format 'table {{.Names}}\\t{{.Status}}' | grep -i ad",
+        "description": "查看 ad 服务容器状态"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "load-generator       Up About an hour\nad                   Up 2 weeks",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -sg 'http://localhost:16686/jaeger/ui/api/traces?service=ad&lookback=1h&limit=5&tags={\"error\":\"true\"}'",
+        "description": "查询 ad 服务近1小时错误 trace"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"data\":[{\"traceID\":\"6a1ab55c9f7ac4df6b3a77a5e1ed0edb\",\"spans\":[{\"traceID\":\"6a1ab55c9f7ac4df6b3a77a5e1ed0edb\",\"spanID\":\"772d411178ff7483\",\"operationName\":\"flagd.evaluation.v2.Service/EventStream\",\"references\":[],\"startTime\":1788597920045241,\"duration\":15758,\"tags\":[{\"key\":\"error\",\"type\":\"bool\",\"value\":true},{\"key\":\"network.peer.address\",\"type\":\"string\",\"value\":\"172.19.0.9\"},{\"key\":\"network.peer.port\",\"type\":\"int64\",\"value\":8013},{\"key\":\"network.type\",\"type\":\"string\",\"value\":\"ipv4\"},{\"key\":\"otel.scope.name\",\"type\":\"string\",\"value\":\"io.opentelemetry.grpc-1.6\"},{\"key\":\"otel.scope.version\",\"type\":\"string\",\"value\":\"2.28.1-alpha\"},{\"key\":\"otel.status_code\",\"type\":\"string\",\"value\":\"ERROR\"},{\"key\":\"rpc.grpc.status_code\",\"type\":\"int64\",\"value\":12},{\"key\":\"rpc.method\",\"type\":\"string\",\"value\":\"EventStream\"},{\"key\":\"rpc.service\",\"type\":\"string\",\"value\":\"flagd.evaluation.v2.Service\"},{\"key\":\"rpc.system\",\"type\":\"string\",\"value\":\"grpc\"},{\"key\":\"server.address\",\"type\":\"string\",\"value\":\"flagd\"},{\"key\":\"server.port\",\"type\":\"int64\",\"value\":8013},{\"key\":\"span.kind\",\"type\":\"string\",\"value\":\"client\"},{\"key\":\"thread.id\",\"type\":\"int64\",\"value\":31},{\"key\":\"thread.name\",\"type\":\"string\",\"value\":\"flagd-rpc-retry-scheduler\"}],\"logs\":[{\"timestamp\":1788597920050665,\"fields\":[{\"key\":\"event\",\"type\":\"string\",\"value\":\"message\"},{\"key\":\"message.id\",\"type\":\"int64\",\"value\":1},{\"key\":\"message.type\",\"type\":\"string\",\"value\":\"SENT\"}]}],\"processID\":\"p1\",\"warnings\":null}],\"processes\":{\"p1\":{\"serviceName\":\"ad\",\"tags\":[{\"key\":\"container.id\",\"type\":\"string\",\"value\":\"b25f17aecb4f037215cb172b5178273c6fcc5b71fd7d88dbe402afa0c0e5df44\"},{\"key\":\"host.arch\",\"type\":\"string\",\"value\":\"aarch64\"},{\"key\":\"host.name\",\"type\":\"string\",\"value\":\"b25f17aecb4f\"},{\"key\":\"os.description\",\"type\":\"string\",\"value\":\"Linux 6.8.0-117-generic\"},{\"key\":\"os.type\",\"type\":\"string\",\"value\":\"linux\"},{\"key\":\"os.version\",\"type\":\"string\",\"value\":\"6.8.0-117-generic\"},{\"key\":\"process.command_line\",\"type\":\"string\",\"value\":\"/opt/java/openjdk/bin/java -javaagent:/usr/src/app/opentelemetry-javaagent.jar -Xmx200m oteldemo.AdService\"},{\"key\":\"process.executable.path\",\"type\":\"string\",\"value\":\"/opt/java/openjdk/bin/java\"},{\"key\":\"process.pid\",\"type\":\"int64\",\"value\":1},{\"key\":\"process.runtime.description\",\"type\":\"string\",\"value\":\"Eclipse Adoptium OpenJDK 64-Bit Server VM 24.0.2+12\"},{\"key\":\"process.runtime.name\",\"type\":\"string\",\"value\":\"OpenJDK Runtime Environment\"},{\"key\":\"process.runtime.version\",\"type\":\"string\",\"value\":\"24.0.2+12\"},{\"key\":\"service.instance.id\",\"type\":\"string\",\"value\":\"1ca98097-fb94-4406-a285-a13e5ba87424\"},{\"key\":\"service.namespace\",\"type\":\"string\",\"value\":\"opentelemetry-demo\"},{\"key\":\"service.version\",\"type\":\"string\",\"value\":\"2.0.2\"},{\"key\":\"telemetry.distro.name\",\"type\":\"string\",\"value\":\"opentelemetry-java-instrumentation\"},{\"key\":\"telemetry.distro.version\",\"type\":\"string\",\"value\":\"2.28.1\"},{\"key\":\"telemetry.sdk.language\",\"type\":\"string\",\"value\":\"java\"},{\"key\":\"telemetry.sdk.name\",\"type\":\"string\",\"value\":\"opentelemetry\"},{\"key\":\"telemetry.sdk.version\",\"type\":\"string\",\"value\":\"1.62.0\"}]}},\"warnings\":null},{\"traceID\":\"9f861e49356a9a07450cd215f2a3ddb2\",\"spans\":[{\"traceID\":\"9f861e49356a9a07450cd215f2a3ddb2\",\"spanID\":\"d6ace44b503bc7a4\",\"operationName\":\"flagd.evaluation.v2.Service/EventStream\",\"references\":[],\"startTime\":1788597932063153,\"duration\":3061,\"tags\":[{\"key\":\"error\",\"type\":\"bool\",\"value\":true},{\"key\":\"network.peer.address\",\"type\":\"string\",\"value\":\"172.19.0.9\"},{\"key\":\"network.peer.port\",\"type\":\"int64\",\"value\":8013},{\"key\":\"network.type\",\"type\":\"string\",\"value\":\"ipv4\"},{\"key\":\"otel.scope.name\",\"type\":\"string\",\"value\":\"io.opentelemetry.grpc-1.6\"},{\"key\":\"otel.scope.version\",\"type\":\"string\",\"value\":\"2.28.1-alpha\"},{\"key\":\"otel.status_code\",\"type\":\"string\",\"value\":\"ERROR\"},{\"key\":\"rpc.grpc.status_code\",\"type\":\"int64\",\"value\":12},{\"key\":\"rpc.method\",\"type\":\"string\",\"value\":\"EventStream\"},{\"key\":\"rpc.service\",\"type\":\"string\",\"value\":\"flagd.evaluation.v2.Service\"},{\"key\":\"rpc.system\",\"type\":\"string\",\"value\":\"grpc\"},{\"key\":\"server.address\",\"type\":\"string\",\"value\":\"flagd\"},{\"key\":\"server.port\",\"type\":\"int64\",\"value\":8013},{\"key\":\"span.kind\",\"type\":\"string\",\"value\":\"client\"},{\"key\":\"thread.id\",\"type\":\"int64\",\"value\":31},{\"key\":\"thread.name\",\"type\":\"string\",\"value\":\"flagd-rpc-retry-scheduler\"}],\"logs\":[{\"timestamp\":1788597932064128,\"fields\":[{\"key\":\"event\",\"type\":\"string\",\"value\":\"message\"},{\"key\":\"message.id\",\"type\":\"int64\",\"value\":1},{\"key\":\"message.type\",\"type\":\"string\",\"value\":\"SENT\"}]}],\"processID\":\"p1\",\"warnings\":null}],\"processes\":{\"p1\":{\"serviceName\":\"ad\",\"tags\":[{\"key\":\"container.id\",\"type\":\"string\",\"value\":\"b25f17aecb4f037215cb172b5178273c6fcc5b71fd7d88dbe402afa0c0e5df44\"},{\"key\":\"host.arch\",\"type\":\"string\",\"value\":\"aarch64\"},{\"key\":\"host.name\",\"type\":\"string\",\"value\":\"b25f17aecb4f\"},{\"key\":\"os.description\",\"type\":\"string\",\"value\":\"Linux 6.8.0-117-generic\"},{\"key\":\"os.type\",\"type\":\"string\",\"value\":\"linux\"},{\"key\":\"os.version\",\"type\":\"string\",\"value\":\"6.8.0-117-generic\"},{\"key\":\"process.command_line\",\"type\":\"string\",\"value\":\"/opt/java/openjdk/bin/java -javaagent:/usr/src/app/opentelemetry-javaagent.jar -Xmx200m oteldemo.AdService\"},{\"key\":\"process.executable.path\",\"type\":\"string\",\"value\":\"/opt/java/openjdk/bin/java\"},{\"key\":\"process.pid\",\"type\":\"int64\",\"value\":1},{\"key\":\"process.runtime.description\",\"type\":\"string\",\"value\":\"Eclipse Adoptium OpenJDK 64-Bit Server VM 24.0.2+12\"},{\"key\":\"process.runtime.name\",\"type\":\"string\",\"value\":\"OpenJDK Runtime Environment\"},{\"key\":\"process.runtime.version\",\"type\":\"string\",\"value\":\"24.0.2+12\"},{\"key\":\"service.instance.id\",\"type\":\"string\",\"value\":\"1ca98097-fb94-4406-a285-a13e5ba87424\"},{\"key\":\"service.namespace\",\"type\":\"string\",\"value\":\"opentelemetry-demo\"},{\"key\":\"service.version\",\"type\":\"string\",\"value\":\"2.0.2\"},{\"key\":\"telemetry.distro.name\",\"type\":\"string\",\"value\":\"opentelemetry-java-instrumentation\"},{\"key\":\"telemetry.distro.version\",\"type\":\"string\",\"value\":\"2.28.1\"},{\"key\":\"telemetry.sdk.language\",\"type\":\"string\",\"value\":\"java\"},{\"key\":\"telemetry.sdk.name\",\"type\":\"string\",\"value\":\"opentelemetry\"},{\"key\":\"telemetry.sdk.version\",\"type\":\"string\",\"value\":\"1.62.0\"}]}},\"warnings\":null},{\"traceID\":\"8499eb0abeeeb022533a3290a1e0afff\",\"spans\":[{\"traceID\":\"8499eb0abeeeb022533a3290a1e0afff\",\"spanID\":\"9f2d730fb7144999\",\"operationName\":\"flagd.evaluation.v2.Service/EventStream\",\"references\":[],\"startTime\":1788597944067285,\"duration\":5556,\"tags\":[{\"key\":\"error\",\"type\":\"bool\",\"value\":true},{\"key\":\"network.peer.address\",\"type\":\"string\",\"value\":\"172.19.0.9\"},{\"key\":\"network.peer.port\",\"type\":\"int64\",\"value\":8013},{\"key\":\"network.type\",\"type\":\"string\",\"value\":\"ipv4\"},{\"key\":\"otel.scope.name\",\"type\":\"string\",\"value\":\"io.opentelemetry.grpc-1.6\"},{\"key\":\"otel.scope.version\",\"type\":\"string\",\"value\":\"2.28.1-alpha\"},{\"key\":\"otel.status_code\",\"type\":\"string\",\"value\":\"ERROR\"},{\"key\":\"rpc.grpc.status_code\",\"type\":\"int64\",\"value\":12},{\"key\":\"rpc.method\",\"type\":\"string\",\"value\":\"EventStream\"},{\"key\":\"rpc.service\",\"type\":\"string\",\"value\":\"flagd.evaluation.v2.Service\"},{\"key\":\"rpc.system\",\"type\":\"string\",\"value\":\"grpc\"},{\"key\":\"server.address\",\"type\":\"string\",\"value\":\"flagd\"},{\"key\":\"server.port\",\"type\":\"int64\",\"value\":8013},{\"key\":\"span.kind\",\"type\":\"string\",\"value\":\"client\"},{\"key\":\"thread.id\",\"type\":\"int64\",\"value\":31},{\"key\":\"thread.name\",\"type\":\"string\",\"value\":\"flagd-rpc-retry-scheduler\"}],\"logs\":[{\"timestamp\":1788597944070412,\"fields\":[{\"key\":\"event\",\"type\":\"string\",\"value\":\"message\"},{\"key\":\"message.id\",\"type\":\"int64\",\"value\":1},{\"key\":\"message.type\",\"type\":\"string\",\"value\":\"SENT\"}]}],\"processID\":\"p1\",\"warnings\":null}],\"processes\":{\"p1\":{\"serviceName\":\"ad\",\"tags\":[{\"key\":\"container.id\",\"type\":\"string\",\"value\":\"b25f17aecb4f037215cb172b5178273c6fcc5b71fd7d88dbe402afa0c0e5df44\"},{\"key\":\"host.arch\",\"type\":\"string\",\"value\":\"aarch64\"},{\"key\":\"host.name\",\"type\":\"string\",\"value\":\"b25f17aecb4f\"},{\"key\":\"os.description\",\"type\":\"string\",\"value\":\"Linux 6.8.0-117-generic\"},{\"key\":\"os.type\",\"type\":\"string\",\"value\":\"linux\"},{\"key\":\"os.version\",\"type\":\"string\",\"value\":\"6.8.0-117-generic\"},{\"key\":\"process.command_line\",\"type\":\"string\",\"value\":\"/opt/java/openjdk/bin/java -javaagent:/usr/src/app/opentelemetry-javaagent.jar -Xmx200m oteldemo.AdService\"},{\"key\":\"process.executable.path\",\"type\":\"string\",\"value\":\"/opt/java/openjdk/bin/java\"},{\"key\":\"process.pid\",\"type\":\"int64\",\"value\":1},{\"key\":\"process.runtime.description\",\"type\":\"string\",\"value\":\"Eclipse Adoptium OpenJDK 64-Bit Server VM 24.0.2+12\"},{\"key\":\"process.runtime.name\",\"type\":\"string\",\"value\":\"OpenJDK Runtime Environment\"},{\"key\":\"process.runtime.version\",\"type\":\"string\",\"value\":\"24.0.2+12\"},{\"key\":\"service.instance.id\",\"type\":\"string\",\"value\":\"1ca98097-fb94-4406-a285-a13e5ba87424\"},{\"key\":\"service.namespace\",\"type\":\"string\",\"value\":\"opentelemetry-demo\"},{\"key\":\"service.version\",\"type\":\"string\",\"value\":\"2.0.2\"},{\"key\":\"telemetry.distro.name\",\"type\":\"string\",\"value\":\"opentelemetry-java-instrumentation\"},{\"key\":\"telemetry.distro.version\",\"type\":\"string\",\"value\":\"2.28.1\"},{\"key\":\"telemetry.sdk.language\",\"type\":\"string\",\"value\":\"java\"},{\"key\":\"telemetry.sdk.name\",\"type\":\"string\",\"value\":\"opentelemetry\"},{\"key\":\"telemetry.sdk.version\",\"type\":\"string\",\"value\":\"1.62.0\"}]}},\"warnings\":null},{\"traceID\":\"470895f012f86605a9f11061e6b50879\",\"spans\":[{\"traceID\":\"470895f012f86605a9f11061e6b50879\",\"spanID\":\"45b061a1117b2072\",\"operationName\":\"flagd.evaluation.v2.Service/EventStream\",\"references\":[],\"startTime\":1788597956073708,\"duration\":2712,\"tags\":[{\"key\":\"error\",\"type\":\"bool\",\"value\":true},{\"key\":\"network.peer.address\",\"type\":\"string\",\"value\":\"172.19.0.9\"},{\"key\":\"network.peer.port\",\"type\":\"int64\",\"value\":8013},{\"key\":\"network.type\",\"type\":\"string\",\"value\":\"ipv4\"},{\"key\":\"otel.scope.name\",\"type\":\"string\",\"value\":\"io.opentelemetry.grpc-1.6\"},{\"key\":\"otel.scope.version\",\"type\":\"string\",\"value\":\"2.28.1-alpha\"},{\"key\":\"otel.status_code\",\"type\":\"string\",\"value\":\"ERROR\"},{\"key\":\"rpc.grpc.status_code\",\"type\":\"int64\",\"value\":12},{\"key\":\"rpc.method\",\"type\":\"string\",\"value\":\"EventStream\"},{\"key\":\"rpc.service\",\"type\":\"string\",\"value\":\"flagd.evaluation.v2.Service\"},{\"key\":\"rpc.system\",\"type\":\"string\",\"value\":\"grpc\"},{\"key\":\"server.address\",\"type\":\"string\",\"value\":\"flagd\"},{\"key\":\"server.port\",\"type\":\"int64\",\"value\":8013},{\"key\":\"span.kind\",\"type\":\"string\",\"value\":\"client\"},{\"key\":\"thread.id\",\"type\":\"int64\",\"value\":31},{\"key\":\"thread.name\",\"type\":\"string\",\"value\":\"flagd-rpc-retry-scheduler\"}],\"logs\":[{\"timestamp\":1788597956074717,\"fields\":[{\"key\":\"event\",\"type\":\"string\",\"value\":\"message\"},{\"key\":\"message.id\",\"type\":\"int64\",\"value\":1},{\"key\":\"message.type\",\"type\":\"string\",\"value\":\"SENT\"}]}],\"processID\":\"p1\",\"warnings\":null}],\"processes\":{\"p1\":{\"serviceName\":\"ad\",\"tags\":[{\"key\":\"container.id\",\"type\":\"string\",\"value\":\"b25f17aecb4f037215cb172b5178273c6fcc5b71fd7d88dbe402afa0c0e5df44\"},{\"key\":\"host.arch\",\"type\":\"string\",\"value\":\"aarch64\"},{\"key\":\"host.name\",\"type\":\"string\",\"value\":\"b25f17aecb4f\"},{\"key\":\"os.description\",\"type\":\"string\",\"value\":\"Linux 6.8.0-117-generic\"},{\"key\":\"os.type\",\"type\":\"string\",\"value\":\"linux\"},{\"key\":\"os.version\",\"type\":\"string\",\"value\":\"6.8.0-117-generic\"},{\"key\":\"process.command_line\",\"type\":\"string\",\"value\":\"/opt/java/openjdk/bin/java -javaagent:/usr/src/app/opentelemetry-javaagent.jar -Xmx200m oteldemo.AdService\"},{\"key\":\"process.executable.path\",\"type\":\"string\",\"value\":\"/opt/java/openjdk/bin/java\"},{\"key\":\"process.pid\",\"type\":\"int64\",\"value\":1},{\"key\":\"process.runtime.description\",\"type\":\"string\",\"value\":\"Eclipse Adoptium OpenJDK 64-Bit Server VM 24.0.2+12\"},{\"key\":\"process.runtime.name\",\"type\":\"string\",\"value\":\"OpenJDK Runtime Environment\"},{\"key\":\"process.runtime.version\",\"type\":\"string\",\"value\":\"24.0.2+12\"},{\"key\":\"service.instance.id\",\"type\":\"string\",\"value\":\"1ca98097-fb94-4406-a285-a13e5ba87424\"},{\"key\":\"service.namespace\",\"type\":\"string\",\"value\":\"opentelemetry-demo\"},{\"key\":\"service.version\",\"type\":\"string\",\"value\":\"2.0.2\"},{\"key\":\"telemetry.distro.name\",\"type\":\"string\",\"value\":\"opentelemetry-java-instrumentation\"},{\"key\":\"telemetry.distro.version\",\"type\":\"string\",\"value\":\"2.28.1\"},{\"key\":\"telemetry.sdk.language\",\"type\":\"string\",\"value\":\"java\"},{\"key\":\"telemetry.sdk.name\",\"type\":\"string\",\"value\":\"opentelemetry\"},{\"key\":\"telemetry.sdk.version\",\"type\":\"string\",\"value\":\"1.62.0\"}]}},\"warnings\":null},{\"traceID\":\"9439093325a1b625a66d2653ac606918\",\"spans\":[{\"traceID\":\"9439093325a1b625a66d2653ac606918\",\"spanID\":\"3a9d781157fc8c9a\",\"operationName\":\"flagd.evaluation.v2.Service/EventStream\",\"references\":[],\"startTime\":1788597968077716,\"duration\":3680,\"tags\":[{\"key\":\"error\",\"type\":\"bool\",\"value\":true},{\"key\":\"network.peer.address\",\"type\":\"string\",\"value\":\"172.19.0.9\"},{\"key\":\"network.peer.port\",\"type\":\"int64\",\"value\":8013},{\"key\":\"network.type\",\"type\":\"string\",\"value\":\"ipv4\"},{\"key\":\"otel.scope.name\",\"type\":\"string\",\"value\":\"io.opentelemetry.grpc-1.6\"},{\"key\":\"otel.scope.version\",\"type\":\"string\",\"value\":\"2.28.1-alpha\"},{\"key\":\"otel.status_code\",\"type\":\"string\",\"value\":\"ERROR\"},{\"key\":\"rpc.grpc.status_code\",\"type\":\"int64\",\"value\":12},{\"key\":\"rpc.method\",\"type\":\"string\",\"value\":\"EventStream\"},{\"key\":\"rpc.service\",\"type\":\"string\",\"value\":\"flagd.evaluation.v2.Service\"},{\"key\":\"rpc.system\",\"type\":\"string\",\"value\":\"grpc\"},{\"key\":\"server.address\",\"type\":\"string\",\"value\":\"flagd\"},{\"key\":\"server.port\",\"type\":\"int64\",\"value\":8013},{\"key\":\"span.kind\",\"type\":\"string\",\"value\":\"client\"},{\"key\":\"thread.id\",\"type\":\"int64\",\"value\":31},{\"key\":\"thread.name\",\"type\":\"string\",\"value\":\"flagd-rpc-retry-scheduler\"}],\"logs\":[{\"timestamp\":1788597968078845,\"fields\":[{\"key\":\"event\",\"type\":\"string\",\"value\":\"message\"},{\"key\":\"message.id\",\"type\":\"int64\",\"value\":1},{\"key\":\"message.type\",\"type\":\"string\",\"value\":\"SENT\"}]}],\"processID\":\"p1\",\"warnings\":null}],\"processes\":{\"p1\":{\"serviceName\":\"ad\",\"tags\":[{\"key\":\"container.id\",\"type\":\"string\",\"value\":\"b25f17aecb4f037215cb172b5178273c6fcc5b71fd7d88dbe402afa0c0e5df44\"},{\"key\":\"host.arch\",\"type\":\"string\",\"value\":\"aarch64\"},{\"key\":\"host.name\",\"type\":\"string\",\"value\":\"b25f17aecb4f\"},{\"key\":\"os.description\",\"type\":\"string\",\"value\":\"Linux 6.8.0-117-generic\"},{\"key\":\"os.type\",\"type\":\"string\",\"value\":\"linux\"},{\"key\":\"os.version\",\"type\":\"string\",\"value\":\"6.8.0-117-generic\"},{\"key\":\"process.command_line\",\"type\":\"string\",\"value\":\"/opt/java/openjdk/bin/java -javaagent:/usr/src/app/opentelemetry-javaagent.jar -Xmx200m oteldemo.AdService\"},{\"key\":\"process.executable.path\",\"type\":\"string\",\"value\":\"/opt/java/openjdk/bin/java\"},{\"key\":\"process.pid\",\"type\":\"int64\",\"value\":1},{\"key\":\"process.runtime.description\",\"type\":\"string\",\"value\":\"Eclipse Adoptium OpenJDK 64-Bit Server VM 24.0.2+12\"},{\"key\":\"process.runtime.name\",\"type\":\"string\",\"value\":\"OpenJDK Runtime Environment\"},{\"key\":\"process.runtime.version\",\"type\":\"string\",\"value\":\"24.0.2+12\"},{\"key\":\"service.instance.id\",\"type\":\"string\",\"value\":\"1ca98097-fb94-4406-a285-a13e5ba87424\"},{\"key\":\"service.namespace\",\"type\":\"string\",\"value\":\"opentelemetry-demo\"},{\"key\":\"service.version\",\"type\":\"string\",\"value\":\"2.0.2\"},{\"key\":\"telemetry.distro.name\",\"type\":\"string\",\"value\":\"opentelemetry-java-instrumentation\"},{\"key\":\"telemetry.distro.version\",\"type\":\"string\",\"value\":\"2.28.1\"},{\"key\":\"telemetry.sdk.language\",\"type\":\"string\",\"value\":\"java\"},{\"key\":\"telemetry.sdk.name\",\"type\":\"string\",\"value\":\"opentelemetry\"},{\"key\":\"telemetry.sdk.version\",\"type\":\"string\",\"value\":\"1.62.0\"}]}},\"warnings\":null}],\"total\":0,\"limit\":0,\"offset\":0,\"errors\":null}",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs ad --tail 50 2>&1 | tail -50",
+        "description": "查看 ad 服务日志"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "\tat java.base/java.net.InetAddress$CachedLookup.get(Unknown Source)\n\tat java.base/java.net.InetAddress.getAllByName0(Unknown Source)\n\tat java.base/java.net.InetAddress.getAllByName(Unknown Source)\n\tat io.grpc.internal.DnsNameResolver$JdkAddressResolver.resolveAddress(DnsNameResolver.java:600)\n\tat io.grpc.internal.DnsNameResolver.resolveAddresses(DnsNameResolver.java:213)\n\tat io.grpc.internal.DnsNameResolver.doResolve(DnsNameResolver.java:267)\n\tat io.grpc.internal.DnsNameResolver$Resolve.run(DnsNameResolver.java:302)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)\n\tat java.base/java.lang.Thread.run(Unknown Source)\n}\nSep 01, 2026 11:54:05 AM io.grpc.internal.ManagedChannelImpl$NameResolverListener handleErrorInSyncContext\nWARNING: [Channel<1>: (flagd:8013)] Failed to resolve name. status=Status{code=UNAVAILABLE, description=Unable to resolve host flagd, cause=java.net.UnknownHostException: flagd\n\tat java.base/java.net.InetAddress$CachedLookup.get(Unknown Source)\n\tat java.base/java.net.InetAddress.getAllByName0(Unknown Source)\n\tat java.base/java.net.InetAddress.getAllByName(Unknown Source)\n\tat io.grpc.internal.DnsNameResolver$JdkAddressResolver.resolveAddress(DnsNameResolver.java:600)\n\tat io.grpc.internal.DnsNameResolver.resolveAddresses(DnsNameResolver.java:213)\n\tat io.grpc.internal.DnsNameResolver.doResolve(DnsNameResolver.java:267)\n\tat io.grpc.internal.DnsNameResolver$Resolve.run(DnsNameResolver.java:302)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)\n\tat java.base/java.lang.Thread.run(Unknown Source)\n}\nSep 01, 2026 11:54:08 AM io.grpc.internal.ManagedChannelImpl$NameResolverListener handleErrorInSyncContext\nWARNING: [Channel<1>: (flagd:8013)] Failed to resolve name. status=Status{code=UNAVAILABLE, description=Unable to resolve host flagd, cause=java.net.UnknownHostException: flagd\n\tat java.base/java.net.InetAddress$CachedLookup.get(Unknown Source)\n\tat java.base/java.net.InetAddress.getAllByName0(Unknown Source)\n\tat java.base/java.net.InetAddress.getAllByName(Unknown Source)\n\tat io.grpc.internal.DnsNameResolver$JdkAddressResolver.resolveAddress(DnsNameResolver.java:600)\n\tat io.grpc.internal.DnsNameResolver.resolveAddresses(DnsNameResolver.java:213)\n\tat io.grpc.internal.DnsNameResolver.doResolve(DnsNameResolver.java:267)\n\tat io.grpc.internal.DnsNameResolver$Resolve.run(DnsNameResolver.java:302)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)\n\tat java.base/java.lang.Thread.run(Unknown Source)\n}\nSep 01, 2026 11:54:11 AM io.grpc.internal.ManagedChannelImpl$NameResolverListener handleErrorInSyncContext\nWARNING: [Channel<1>: (flagd:8013)] Failed to resolve name. status=Status{code=UNAVAILABLE, description=Unable to resolve host flagd, cause=java.net.UnknownHostException: flagd\n\tat java.base/java.net.InetAddress$CachedLookup.get(Unknown Source)\n\tat java.base/java.net.InetAddress.getAllByName0(Unknown Source)\n\tat java.base/java.net.InetAddress.getAllByName(Unknown Source)\n\tat io.grpc.internal.DnsNameResolver$JdkAddressResolver.resolveAddress(DnsNameResolver.java:600)\n\tat io.grpc.internal.DnsNameResolver.resolveAddresses(DnsNameResolver.java:213)\n\tat io.grpc.internal.DnsNameResolver.doResolve(DnsNameResolver.java:267)\n\tat io.grpc.internal.DnsNameResolver$Resolve.run(DnsNameResolver.java:302)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)\n\tat java.base/java.lang.Thread.run(Unknown Source)\n}",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps -a --format 'table {{.Names}}\\t{{.Status}}\\t{{.Networks}}' | grep -i flagd\necho \"---ad networks---\"\ndocker inspect ad --format '{{json .NetworkSettings.Networks}}' | python3 -m json.tool 2>/dev/null || docker inspect ad --format '{{json .NetworkSettings.Networks}}'\necho \"---flagd networks---\"\ndocker inspect flagd --format '{{json .NetworkSettings.Networks}}' 2>&1",
+        "description": "检查 flagd 容器状态及 ad/flagd 网络归属"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "flagd                  Up 3 days                         opentelemetry-demo\n---ad networks---\n{\n    \"opentelemetry-demo\": {\n        \"IPAMConfig\": null,\n        \"Links\": null,\n        \"Aliases\": [\n            \"ad\",\n            \"ad\"\n        ],\n        \"DriverOpts\": null,\n        \"GwPriority\": 0,\n        \"NetworkID\": \"8706fc72057a04918a202aee16e970329cd5b7030b1f683380246246078cb9a4\",\n        \"EndpointID\": \"1029247afb432cb7f515c3ae6a3b293892646e82cdcac8ccc783b973e08d41df\",\n        \"Gateway\": \"172.19.0.1\",\n        \"IPAddress\": \"172.19.0.4\",\n        \"MacAddress\": \"26:8c:28:57:79:67\",\n        \"IPPrefixLen\": 16,\n        \"IPv6Gateway\": \"\",\n        \"GlobalIPv6Address\": \"\",\n        \"GlobalIPv6PrefixLen\": 0,\n        \"DNSNames\": [\n            \"ad\",\n            \"b25f17aecb4f\"\n        ]\n    }\n}\n---flagd networks---\n{\"opentelemetry-demo\":{\"IPAMConfig\":null,\"Links\":null,\"Aliases\":[\"flagd\",\"flagd\"],\"DriverOpts\":null,\"GwPriority\":0,\"NetworkID\":\"8706fc72057a04918a202aee16e970329cd5b7030b1f683380246246078cb9a4\",\"EndpointID\":\"bbe9e2a30690cd209c94746a4a1d85d687451dc09fcccb03696afe91d5dbeb52\",\"Gateway\":\"172.19.0.1\",\"IPAddress\":\"172.19.0.9\",\"MacAddress\":\"86:20:86:b3:c6:2f\",\"IPPrefixLen\":16,\"IPv6Gateway\":\"\",\"GlobalIPv6Address\":\"\",\"GlobalIPv6PrefixLen\":0,\"DNSNames\":[\"flagd\",\"d8590b82b101\"]}}",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s --data-urlencode 'query={service_name=\"ad\"}' 'http://localhost:9090/api/v1/query' | python3 -c \"import sys,json; d=json.load(sys.stdin); print(sorted(set(r['metric']['__name__'] for r in d['data']['result'])))\" 2>/dev/null",
+        "description": "列出 ad 服务当前暴露的 Prometheus 指标名"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "['demo_ad_requests_total', 'jvm_class_count', 'jvm_class_loaded_total', 'jvm_class_unloaded_total', 'jvm_cpu_count', 'jvm_cpu_recent_utilization_ratio', 'jvm_cpu_time_seconds_total', 'jvm_gc_duration_seconds_bucket', 'jvm_gc_duration_seconds_count', 'jvm_gc_duration_seconds_sum', 'jvm_memory_committed_bytes', 'jvm_memory_limit_bytes', 'jvm_memory_used_after_last_gc_bytes', 'jvm_memory_used_bytes', 'jvm_thread_count', 'otel_sdk_metric_reader_collection_duration_seconds_bucket', 'otel_sdk_metric_reader_collection_duration_seconds_count', 'otel_sdk_metric_reader_collection_duration_seconds_sum', 'otlp_exporter_exported_total', 'otlp_exporter_seen_total', 'processedLogs_total', 'processedSpans_total', 'queueSize_ratio', 'rpc_client_duration_milliseconds_bucket', 'rpc_client_duration_milliseconds_count', 'rpc_client_duration_milliseconds_sum', 'rpc_client_request_size_bytes_bucket', 'rpc_client_request_size_bytes_count', 'rpc_client_request_size_bytes_sum', 'rpc_server_duration_milliseconds_bucket', 'rpc_server_duration_milliseconds_count', 'rpc_server_duration_milliseconds_sum', 'rpc_server_request_size_bytes_bucket', 'rpc_server_request_size_bytes_count', 'rpc_server_request_size_bytes_sum', 'rpc_server_response_size_bytes_bucket', 'rpc_server_response_size_bytes_count', 'rpc_server_response_size_bytes_sum', 'traces_span_metrics_calls_total', 'traces_span_metrics_duration_milliseconds_bucket', 'traces_span_metrics_duration_milliseconds_count', 'traces_span_metrics_duration_milliseconds_sum']",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s --data-urlencode 'query=sum by (span_name,status_code) (rate(traces_span_metrics_calls_total{service_name=\"ad\"}[5m]))' 'http://localhost:9090/api/v1/query' | python3 -m json.tool",
+        "description": "查询 ad 服务近5分钟按调用名/状态码统计的错误率"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {\n                    \"span_name\": \"flagd.evaluation.v2.Service/EventStream\",\n                    \"status_code\": \"STATUS_CODE_ERROR\"\n                },\n                \"value\": [\n                    1788598026.215,\n                    \"0.0833687650584832\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"span_name\": \"getRandomAds\",\n                    \"status_code\": \"STATUS_CODE_UNSET\"\n                },\n                \"value\": [\n                    1788598026.215,\n                    \"0\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"span_name\": \"resolve\",\n                    \"status_code\": \"STATUS_CODE_UNSET\"\n                },\n                \"value\": [\n                    1788598026.215,\n                    \"0\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"span_name\": \"oteldemo.AdService/GetAds\",\n                    \"status_code\": \"STATUS_CODE_UNSET\"\n                },\n                \"value\": [\n                    1788598026.215,\n                    \"0\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"span_name\": \"getAdsByCategory\",\n                    \"status_code\": \"STATUS_CODE_UNSET\"\n                },\n                \"value\": [\n                    1788598026.215,\n                    \"0\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"span_name\": \"flagd.evaluation.v2.Service/ResolveBoolean\",\n                    \"status_code\": \"STATUS_CODE_ERROR\"\n                },\n                \"value\": [\n                    1788598026.215,\n                    \"0\"\n                ]\n            }\n        ]\n    }\n}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s --data-urlencode 'query=demo_ad_requests_total' 'http://localhost:9090/api/v1/query' | python3 -m json.tool\necho \"---rate---\"\ncurl -s --data-urlencode 'query=sum by (feature_flag,ad_request_type) (rate(demo_ad_requests_total[5m]))' 'http://localhost:9090/api/v1/query' | python3 -m json.tool",
+        "description": "查看 demo_ad_requests_total 指标详情，确认失败标签"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {\n                    \"__name__\": \"demo_ad_requests_total\",\n                    \"demo_ad_request_type\": \"NOT_TARGETED\",\n                    \"demo_ad_response_type\": \"RANDOM\",\n                    \"instance\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"job\": \"opentelemetry-demo/ad\",\n                    \"service_instance_id\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"service_name\": \"ad\",\n                    \"service_namespace\": \"opentelemetry-demo\"\n                },\n                \"value\": [\n                    1788598035.255,\n                    \"83\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"__name__\": \"demo_ad_requests_total\",\n                    \"demo_ad_request_type\": \"TARGETED\",\n                    \"demo_ad_response_type\": \"RANDOM\",\n                    \"instance\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"job\": \"opentelemetry-demo/ad\",\n                    \"service_instance_id\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"service_name\": \"ad\",\n                    \"service_namespace\": \"opentelemetry-demo\"\n                },\n                \"value\": [\n                    1788598035.255,\n                    \"71\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"__name__\": \"demo_ad_requests_total\",\n                    \"demo_ad_request_type\": \"TARGETED\",\n                    \"demo_ad_response_type\": \"TARGETED\",\n                    \"instance\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"job\": \"opentelemetry-demo/ad\",\n                    \"service_instance_id\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"service_name\": \"ad\",\n                    \"service_namespace\": \"opentelemetry-demo\"\n                },\n                \"value\": [\n                    1788598035.255,\n                    \"6606\"\n                ]\n            }\n        ]\n    }\n}\n---rate---\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {},\n                \"value\": [\n                    1788598035.325,\n                    \"0\"\n                ]\n            }\n        ]\n    }\n}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd aiops-agentic-rl/AIops-agent/workspace/ad 2>/dev/null && grep -rn \"adFailure\" --include=*.java -i . | head -30",
+        "description": "在 ad 服务源码中查找 adFailure 开关的使用逻辑"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Exit code 1",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "ls aiops-agentic-rl/AIops-agent/workspace/ 2>&1",
+        "description": "列出 workspace 目录下的仓库"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "recommendation",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s --data-urlencode 'query=sum(rate(traces_span_metrics_calls_total{service_name=\"ad\",span_name=\"oteldemo.AdService/GetAds\"}[5m])) by (status_code)' 'http://localhost:9090/api/v1/query' | python3 -m json.tool\necho \"---frontend calling ad---\"\ncurl -s --data-urlencode 'query=sum(rate(traces_span_metrics_calls_total{span_name=~\".*Ad.*\"}[5m])) by (service_name,span_name,status_code)' 'http://localhost:9090/api/v1/query' | python3 -m json.tool",
+        "description": "确认 AdService/GetAds 调用的错误状态码分布及上游 frontend 调用情况"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {\n                    \"status_code\": \"STATUS_CODE_UNSET\"\n                },\n                \"value\": [\n                    1788598068.524,\n                    \"0\"\n                ]\n            }\n        ]\n    }\n}\n---frontend calling ad---\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {\n                    \"service_name\": \"ad\",\n                    \"span_name\": \"getRandomAds\",\n                    \"status_code\": \"STATUS_CODE_UNSET\"\n                },\n                \"value\": [\n                    1788598068.634,\n                    \"0\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"service_name\": \"frontend\",\n                    \"span_name\": \"grpc.oteldemo.CartService/AddItem\",\n                    \"status_code\": \"STATUS_CODE_ERROR\"\n                },\n                \"value\": [\n                    1788598068.634,\n                    \"0\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"service_name\": \"ad\",\n                    \"span_name\": \"oteldemo.AdService/GetAds\",\n                    \"status_code\": \"STATUS_CODE_UNSET\"\n                },\n                \"value\": [\n                    1788598068.634,\n                    \"0\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"service_name\": \"ad\",\n                    \"span_name\": \"getAdsByCategory\",\n                    \"status_code\": \"STATUS_CODE_UNSET\"\n                },\n                \"value\": [\n                    1788598068.634,\n                    \"0\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"service_name\": \"frontend\",\n                    \"span_name\": \"grpc.oteldemo.AdService/GetAds\",\n                    \"status_code\": \"STATUS_CODE_UNSET\"\n                },\n                \"value\": [\n                    1788598068.634,\n                    \"0\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"service_name\": \"frontend\",\n                    \"span_name\": \"grpc.oteldemo.AdService/GetAds\",\n                    \"status_code\": \"STATUS_CODE_ERROR\"\n                },\n                \"value\": [\n                    1788598068.634,\n                    \"0\"\n                ]\n            }\n        ]\n    }\n}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s --data-urlencode 'query=traces_span_metrics_calls_total{span_name=\"grpc.oteldemo.AdService/GetAds\"}' 'http://localhost:9090/api/v1/query' | python3 -m json.tool\necho \"---increase 15m---\"\ncurl -s --data-urlencode 'query=increase(traces_span_metrics_calls_total{span_name=\"grpc.oteldemo.AdService/GetAds\"}[15m])' 'http://localhost:9090/api/v1/query' | python3 -m json.tool",
+        "description": "检查 frontend 调用 ad 服务的总调用量及15分钟增量"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {\n                    \"__name__\": \"traces_span_metrics_calls_total\",\n                    \"job\": \"opentelemetry-demo/frontend\",\n                    \"service_name\": \"frontend\",\n                    \"service_namespace\": \"opentelemetry-demo\",\n                    \"span_kind\": \"SPAN_KIND_CLIENT\",\n                    \"span_name\": \"grpc.oteldemo.AdService/GetAds\",\n                    \"status_code\": \"STATUS_CODE_UNSET\"\n                },\n                \"value\": [\n                    1788598077,\n                    \"30956\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"__name__\": \"traces_span_metrics_calls_total\",\n                    \"job\": \"opentelemetry-demo/frontend\",\n                    \"service_name\": \"frontend\",\n                    \"service_namespace\": \"opentelemetry-demo\",\n                    \"span_kind\": \"SPAN_KIND_CLIENT\",\n                    \"span_name\": \"grpc.oteldemo.AdService/GetAds\",\n                    \"status_code\": \"STATUS_CODE_ERROR\"\n                },\n                \"value\": [\n                    1788598077,\n                    \"9\"\n                ]\n            }\n        ]\n    }\n}\n---increase 15m---\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {\n                    \"job\": \"opentelemetry-demo/frontend\",\n                    \"service_name\": \"frontend\",\n                    \"service_namespace\": \"opentelemetry-demo\",\n                    \"span_kind\": \"SPAN_KIND_CLIENT\",\n                    \"span_name\": \"grpc.oteldemo.AdService/GetAds\",\n                    \"status_code\": \"STATUS_CODE_UNSET\"\n                },\n                \"value\": [\n                    1788598077.095,\n                    \"0\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"job\": \"opentelemetry-demo/frontend\",\n                    \"service_name\": \"frontend\",\n                    \"service_namespace\": \"opentelemetry-demo\",\n                    \"span_kind\": \"SPAN_KIND_CLIENT\",\n                    \"span_name\": \"grpc.oteldemo.AdService/GetAds\",\n                    \"status_code\": \"STATUS_CODE_ERROR\"\n                },\n                \"value\": [\n                    1788598077.095,\n                    \"0\"\n                ]\n            }\n        ]\n    }\n}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker stats --no-stream ad\necho \"---restart count / oom---\"\ndocker inspect ad --format '{{.RestartCount}} OOMKilled={{.State.OOMKilled}} StartedAt={{.State.StartedAt}}'\necho \"---frontend logs grep ad---\"\ndocker logs frontend --tail 300 2>&1 | grep -i \"ad\" | tail -20",
+        "description": "检查 ad 容器资源占用、重启次数,及 frontend 日志中 ad 相关报错"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "CONTAINER ID   NAME      CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O       PIDS\nb25f17aecb4f   ad        0.13%     244.2MiB / 300MiB   81.39%    63.9MB / 422MB   246kB / 445MB   38\n---restart count / oom---\n0 OOMKilled=false StartedAt=2026-08-18T08:12:30.463431692Z\n---frontend logs grep ad---\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]\n  metadata: [Metadata]",
+      "signal_types_covered": [
+        "logs",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs frontend --tail 1000 2>&1 | grep -iE \"adservice|getads|ad service\" | tail -30",
+        "description": "检查 frontend 日志中 AdService 调用相关错误"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "(Bash completed with no output)",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs ad --tail 500 2>&1 | grep -iE \"fail|exception|error\" | grep -v \"flagd\" | tail -30\necho \"---last 20 lines raw---\"\ndocker logs ad --tail 20 2>&1",
+        "description": "检查 ad 服务日志中非 flagd DNS 相关的错误/异常"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Sep 01, 2026 11:54:03 AM io.grpc.internal.ManagedChannelImpl$NameResolverListener handleErrorInSyncContext\nSep 01, 2026 11:54:04 AM io.grpc.internal.ManagedChannelImpl$NameResolverListener handleErrorInSyncContext\nSep 01, 2026 11:54:05 AM io.grpc.internal.ManagedChannelImpl$NameResolverListener handleErrorInSyncContext\nSep 01, 2026 11:54:08 AM io.grpc.internal.ManagedChannelImpl$NameResolverListener handleErrorInSyncContext\nSep 01, 2026 11:54:11 AM io.grpc.internal.ManagedChannelImpl$NameResolverListener handleErrorInSyncContext\n---last 20 lines raw---\n\tat io.grpc.internal.DnsNameResolver.resolveAddresses(DnsNameResolver.java:213)\n\tat io.grpc.internal.DnsNameResolver.doResolve(DnsNameResolver.java:267)\n\tat io.grpc.internal.DnsNameResolver$Resolve.run(DnsNameResolver.java:302)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)\n\tat java.base/java.lang.Thread.run(Unknown Source)\n}\nSep 01, 2026 11:54:11 AM io.grpc.internal.ManagedChannelImpl$NameResolverListener handleErrorInSyncContext\nWARNING: [Channel<1>: (flagd:8013)] Failed to resolve name. status=Status{code=UNAVAILABLE, description=Unable to resolve host flagd, cause=java.net.UnknownHostException: flagd\n\tat java.base/java.net.InetAddress$CachedLookup.get(Unknown Source)\n\tat java.base/java.net.InetAddress.getAllByName0(Unknown Source)\n\tat java.base/java.net.InetAddress.getAllByName(Unknown Source)\n\tat io.grpc.internal.DnsNameResolver$JdkAddressResolver.resolveAddress(DnsNameResolver.java:600)\n\tat io.grpc.internal.DnsNameResolver.resolveAddresses(DnsNameResolver.java:213)\n\tat io.grpc.internal.DnsNameResolver.doResolve(DnsNameResolver.java:267)\n\tat io.grpc.internal.DnsNameResolver$Resolve.run(DnsNameResolver.java:302)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(Unknown Source)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(Unknown Source)\n\tat java.base/java.lang.Thread.run(Unknown Source)\n}",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "flagd 中 adFailure 功能开关被静态置为 on，导致 ad 服务对广告请求整体主动返回失败；ad 容器自身 CPU/内存/重启次数均正常，非资源或代码问题。修复需在 flagd 侧关闭该开关，此操作不在低风险白名单内（flagd 非授权处置目标，且非重启/迁移/扩容命令形态），故未自动执行，交人工处理。",
+        "kind": "config",
+        "suspect_service": "ad",
+        "remediation_type": "online_op",
+        "remediation_detail": "建议人工在 flagd 管理界面/配置中将 adFailure 开关由 on 改回 off（或删除该 targeting override），使 ad 服务恢复正常返回广告。不建议重启/重建 ad 容器——该故障由 flagd 集中判定并通过 OFREP/gRPC ResolveBoolean 返回给 ad 服务，与 ad 容器自身状态无关，重启无法止血，且 flagd 及\"改功能开关\"操作均不在当前低风险白名单授权范围内，本次未执行任何自动处置。",
+        "confidence": 0.9,
+        "evidence": [
+          "POST http://localhost:8016/ofrep/v1/evaluate/flags/adFailure -> {\"value\":true,\"reason\":\"STATIC\",\"variant\":\"on\"}，权威确认开关处于 on",
+          "docker stats --no-stream ad -> CPU 0.13%, MEM 244.2MiB/300MiB(81%,JVM固定堆非持续增长), 与告警描述'CPU/内存均在正常范围'一致",
+          "docker inspect ad --format RestartCount/OOMKilled -> 0 / false，容器自2026-08-18持续运行未重启，排除资源型故障",
+          "Jaeger: curl 'http://localhost:16686/jaeger/ui/api/traces?service=ad&lookback=1h&tags={\"error\":\"true\"}' 显示 flagd.evaluation.v2.Service/EventStream 报错(grpc status 12)，为flagd事件订阅噪音而非主评估路径故障",
+          "docker inspect ad/flagd 网络: 均在 opentelemetry-demo 网络下，别名 'ad'/'flagd' 均正确注册，排除网络不可达导致的开关取值失败",
+          "Prometheus: traces_span_metrics_calls_total{span_name=\"grpc.oteldemo.AdService/GetAds\"} 累计 status_code=STATUS_CODE_ERROR 为9次，STATUS_CODE_UNSET为30956次，历史确有报错样本；increase(...[15m])=0 说明当前采集窗口流量很低",
+          "未执行任何处置命令：根因指向 flagd 侧配置项而非 docker 容器实例，不在白名单三类命令(restart_instance/migrate_instance/scale_resources)覆盖范围，也不在授权处置目标(ad/cart/...)之列，故未自动执行"
+        ],
+        "also_code_fix": false,
+        "suspect_repo": null,
+        "suspect_commit_hint": null,
+        "suspect_file_hint": null
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "prometheus",
+        "jaeger",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ],
+  "final_diagnosis": {
+    "summary": "flagd 中 adFailure 功能开关被静态置为 on，导致 ad 服务对广告请求整体主动返回失败；ad 容器自身 CPU/内存/重启次数均正常，非资源或代码问题。修复需在 flagd 侧关闭该开关，此操作不在低风险白名单内（flagd 非授权处置目标，且非重启/迁移/扩容命令形态），故未自动执行，交人工处理。",
+    "kind": "config",
+    "suspect_service": "ad",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "online_op",
+    "remediation_detail": "建议人工在 flagd 管理界面/配置中将 adFailure 开关由 on 改回 off（或删除该 targeting override），使 ad 服务恢复正常返回广告。不建议重启/重建 ad 容器——该故障由 flagd 集中判定并通过 OFREP/gRPC ResolveBoolean 返回给 ad 服务，与 ad 容器自身状态无关，重启无法止血，且 flagd 及\"改功能开关\"操作均不在当前低风险白名单授权范围内，本次未执行任何自动处置。",
+    "confidence": 0.9,
+    "evidence": [
+      "POST http://localhost:8016/ofrep/v1/evaluate/flags/adFailure -> {\"value\":true,\"reason\":\"STATIC\",\"variant\":\"on\"}，权威确认开关处于 on",
+      "docker stats --no-stream ad -> CPU 0.13%, MEM 244.2MiB/300MiB(81%,JVM固定堆非持续增长), 与告警描述'CPU/内存均在正常范围'一致",
+      "docker inspect ad --format RestartCount/OOMKilled -> 0 / false，容器自2026-08-18持续运行未重启，排除资源型故障",
+      "Jaeger: curl 'http://localhost:16686/jaeger/ui/api/traces?service=ad&lookback=1h&tags={\"error\":\"true\"}' 显示 flagd.evaluation.v2.Service/EventStream 报错(grpc status 12)，为flagd事件订阅噪音而非主评估路径故障",
+      "docker inspect ad/flagd 网络: 均在 opentelemetry-demo 网络下，别名 'ad'/'flagd' 均正确注册，排除网络不可达导致的开关取值失败",
+      "Prometheus: traces_span_metrics_calls_total{span_name=\"grpc.oteldemo.AdService/GetAds\"} 累计 status_code=STATUS_CODE_ERROR 为9次，STATUS_CODE_UNSET为30956次，历史确有报错样本；increase(...[15m])=0 说明当前采集窗口流量很低",
+      "未执行任何处置命令：根因指向 flagd 侧配置项而非 docker 容器实例，不在白名单三类命令(restart_instance/migrate_instance/scale_resources)覆盖范围，也不在授权处置目标(ad/cart/...)之列，故未自动执行"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "feishu_online_op",
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"flagd 中 adFailure 功能开关被静态置为 on，导致 ad 服务对广告请求整体主动返回失败；ad 容器自身 CPU/内存/重启次数均正常，非资源或代码问题。修复需在 flagd 侧关闭该开关，此操作不在低风险白名单内（flagd 非授权处置目标，且非重启/迁移/扩容命令形态），故未自动执行，交人工处理。\",\"kind\":\"config\",\"suspect_service\":\"ad\",\"remediation_type\":\"online_op\",\"remediation_detail\":\"建议人工在 flagd 管理界面/配置中将 adFailure 开关由 on 改回 off（或删除该 targeting override），使 ad 服务恢复正常返回广告。不建议重启/重建 ad 容器——该故障由 flagd 集中判定并通过 OFREP/gRPC ResolveBoolean 返回给 ad 服务，与 ad 容器自身状态无关，重启无法止血，且 flagd 及\\\"改功能开关\\\"操作均不在当前低风险白名单授权范围内，本次未执行任何自动处置。\",\"confidence\":0.9,\"evidence\":[\"POST http://localhost:8016/ofrep/v1/evaluate/flags/adFailure -> {\\\"value\\\":true,\\\"reason\\\":\\\"STATIC\\\",\\\"variant\\\":\\\"on\\\"}，权威确认开关处于 on\",\"docker stats --no-stream ad -> CPU 0.13%, MEM 244.2MiB/300MiB(81%,JVM固定堆非持续增长), 与告警描述'CPU/内存均在正常范围'一致\",\"docker inspect ad --format RestartCount/OOMKilled -> 0 / false，容器自2026-08-18持续运行未重启，排除资源型故障\",\"Jaeger: curl 'http://localhost:16686/jaeger/ui/api/traces?service=ad&lookback=1h&tags={\\\"error\\\":\\\"true\\\"}' 显示 flagd.evaluation.v2.Service/EventStream 报错(grpc status 12)，为flagd事件订阅噪音而非主评估路径故障\",\"docker inspect ad/flagd 网络: 均在 opentelemetry-demo 网络下，别名 'ad'/'flagd' 均正确注册，排除网络不可达导致的开关取值失败\",\"Prometheus: traces_span_metrics_calls_total{span_name=\\\"grpc.oteldemo.AdService/GetAds\\\"} 累计 status_code=STATUS_CODE_ERROR 为9次，STATUS_CODE_UNSET为30956次，历史确有报错样本；increase(...[15m])=0 说明当前采集窗口流量很低\",\"未执行任何处置命令：根因指向 flagd 侧配置项而非 docker 容器实例，不在白名单三类命令(restart_instance/migrate_instance/scale_resources)覆盖范围，也不在授权处置目标(ad/cart/...)之列，故未自动执行\"],\"also_code_fix\":false,\"suspect_repo\":null,\"suspect_commit_hint\":null,\"suspect_file_hint\":null}"
+  }
+}

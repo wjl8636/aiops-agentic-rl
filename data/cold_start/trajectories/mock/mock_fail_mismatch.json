@@ -1,0 +1,58 @@
+{
+  "alert": {
+    "alertname": "MockMismatchedConclusion",
+    "service": "currency",
+    "labels": {
+      "service": "currency",
+      "severity": "warning",
+      "job": "currency"
+    },
+    "annotations": {
+      "summary": "currency 延迟上升",
+      "description": "currency 服务延迟上升。"
+    },
+    "startsAt": "2026-06-20T14:00:00Z"
+  },
+  "alert_id": "mock_fail_mismatch",
+  "steps": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker stats --no-stream currency"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "currency   CPU% 97.0",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ],
+  "final_diagnosis": {
+    "summary": "currency 服务判定为 info_only，无需处置。",
+    "kind": "resource",
+    "suspect_service": "payment",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "info_only",
+    "remediation_detail": "无需处置。",
+    "confidence": 0.75,
+    "evidence": [
+      "docker stats 显示 currency CPU% 97.0"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "info_only",
+  "post_action_health": null,
+  "meta": {
+    "source": "mock",
+    "degraded": null,
+    "raw": null
+  }
+}

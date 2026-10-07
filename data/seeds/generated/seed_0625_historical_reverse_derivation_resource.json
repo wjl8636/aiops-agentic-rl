@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0028-recommendation-resource",
+    "description": "recommendation 的推理批大小配置被一次变更调低，导致单位时间内需要处理的批次数明显增多、单位请求的固定开销占比上升，CPU 使用率持续处于高位，没有伴随代码发版。"
+  },
+  "startsAt": "2026-07-21T14:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0028-recommendation-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

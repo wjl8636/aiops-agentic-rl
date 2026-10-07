@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "currency",
+  "labels": {
+    "service": "currency",
+    "severity": "warning",
+    "job": "currencyservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0003-currency-dependency",
+    "description": "currency 依赖外部汇率服务商拉取实时汇率，这次调用没有配超时；服务商一次维护窗口期间响应大幅变慢，currency 的请求处理线程逐个卡在等待汇率响应上，价格换算接口整体超时，checkout 结算页汇率展示报错。"
+  },
+  "startsAt": "2026-07-22T00:30:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0003-currency-dependency：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

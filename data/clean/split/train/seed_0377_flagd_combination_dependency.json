@@ -1,0 +1,15 @@
+{
+  "alertname": "AdServiceFailure",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "ad 服务整体请求失败",
+    "description": "ad 服务对广告请求整体返回失败（adFailure 开关），上游 frontend 调用 ad 接口大量报错，ad 服务自身 CPU/内存均在正常范围，判断是功能开关级故障而非资源问题。"
+  },
+  "startsAt": "2026-07-10T10:14:00Z",
+  "scenario_hint": "[flagd组合/单点] flag=adFailure：单一 flagd 故障开关构造的dependency 场景"
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "quote",
+  "labels": {
+    "service": "quote",
+    "severity": "critical",
+    "job": "quoteservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0036-quote-resource",
+    "description": "quote 服务的入参校验正则表达式配置被一次变更改成了一个存在回溯风险的写法，个别输入会触发正则回溯，CPU 使用率持续处于高位，没有伴随代码发版。"
+  },
+  "startsAt": "2026-07-21T05:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0036-quote-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

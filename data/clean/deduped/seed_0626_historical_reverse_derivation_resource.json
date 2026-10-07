@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0034-ad-resource",
+    "description": "告警描述与当前实时观测矛盾，判定为陈旧/失效告警，当前不存在需要止血的活跃 CPU 饱和问题，未执行任何处置。"
+  },
+  "startsAt": "2026-07-21T14:45:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0034-ad-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

@@ -1,0 +1,40 @@
+{
+  "remediation_type": "online_op",
+  "suspect_service": "ad",
+  "expect_route": "feishu_online_op",
+  "expect_kind_any_of": [
+    "resource",
+    "config"
+  ],
+  "expect_confidence_range": [
+    0.6,
+    0.95
+  ],
+  "expect_evidence_groups": [
+    [
+      "ofrep",
+      "OFREP",
+      "8016",
+      "adHighCpu",
+      "开关"
+    ],
+    [
+      "docker logs",
+      "docker stats",
+      "docker inspect",
+      "docker ps",
+      "jaeger",
+      "Jaeger",
+      ":16686",
+      "日志",
+      "kafka-consumer-groups",
+      "kafka-console",
+      "fraud-detection",
+      "sleeping",
+      "trace",
+      "Trace",
+      "容器"
+    ]
+  ],
+  "_family": "B1a"
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "AdLatencyCascadingTimeout",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "critical",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "ad 延迟劣化导致首页广告位大面积超时",
+    "description": "ad 服务响应延迟持续恶化，首页广告位大面积超时返回兜底空白，广告收入监控曲线明显下滑。ad 容器的常规资源读数（CPU/内存）都在正常范围，但延迟问题真实存在且持续恶化，怀疑是adHighCpu 负载注入开关被打开——指标读数与业务表现不一致，请多信源交叉验证后定位。"
+  },
+  "startsAt": "2026-09-07T09:35:00Z",
+  "scenario_hint": "[v9增强/B1a_交叉验证] flags=adHighCpu：注入真实故障但观测信号降级（Prometheus lag 冻结/ad 机制不生效/后端不可观测），OFREP 是权威第一信源——验证「OFREP 查 flag → Prometheus 读数正常不据此否定 → 换第二信源交叉验证 → 收敛输出 kind/route/confidence，不执行白名单外操作」"
+}

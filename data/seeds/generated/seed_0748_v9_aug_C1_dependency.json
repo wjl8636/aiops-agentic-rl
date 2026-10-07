@@ -1,0 +1,15 @@
+{
+  "alertname": "AdRequestsFailing",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "critical",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "ad 服务对广告请求整体返回失败",
+    "description": "ad 服务对广告请求整体返回失败（adFailure 开关被打开），首页广告位全部空白，广告收入曲线快速下滑。ad 容器存活、资源指标正常、无发版。请定位确认后给出处置建议。"
+  },
+  "startsAt": "2026-09-04T17:00:00Z",
+  "scenario_hint": "[v9增强/C1_早收敛] flag=adFailure：单 flag、单服务、证据链清晰——验证「Skill → OFREP 查 flag → 1-2 步旁证 → 收敛，总步数 ≤8」的效率目标行为"
+}

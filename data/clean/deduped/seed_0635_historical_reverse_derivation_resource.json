@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "product-catalog",
+  "labels": {
+    "service": "product-catalog",
+    "severity": "warning",
+    "job": "product-catalog"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0006-product-catalog-resource",
+    "description": "product-catalog 的一个模糊搜索功能开关被误打开（本意只在测试环境启用），该模式下每次查询的计算成本明显更高，CPU 使用率持续处于高位，没有伴随代码发版。"
+  },
+  "startsAt": "2026-07-21T21:30:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0006-product-catalog-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

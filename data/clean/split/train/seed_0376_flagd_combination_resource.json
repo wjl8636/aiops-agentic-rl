@@ -1,0 +1,15 @@
+{
+  "alertname": "FrontendTrafficFlood",
+  "service": "frontend",
+  "labels": {
+    "service": "frontend",
+    "severity": "warning",
+    "job": "frontend"
+  },
+  "annotations": {
+    "summary": "frontend 首页流量骤增导致过载",
+    "description": "frontend 首页请求量在短时间内暴增（loadGeneratorFloodHomepage 开关），实例 CPU 与连接数迅速逼近上限，属于流量驱动的资源型过载，非代码回归。"
+  },
+  "startsAt": "2026-07-10T10:07:00Z",
+  "scenario_hint": "[flagd组合/单点] flag=loadGeneratorFloodHomepage：单一 flagd 故障开关构造的resource 场景"
+}

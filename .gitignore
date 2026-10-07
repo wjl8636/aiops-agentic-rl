@@ -1,0 +1,25 @@
+# macOS
+.DS_Store
+
+# Claude Code (本地配置与自定义 skill，不公开)
+.claude/
+
+# IntelliJ IDEA
+.idea/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.env
+
+# 训练/评测产物（体量大或含运行态数据，不入库）
+outputs/
+checkpoints/
+reports/
+*.log
+data/clean/*.jsonl
+data/cold_start/trajectories/*.jsonl
+smoke_test/out/
+grpo/verl_data/

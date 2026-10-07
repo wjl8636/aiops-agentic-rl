@@ -1,0 +1,15 @@
+{
+  "alertname": "AdServiceCompoundResourcePressure",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "critical",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "ad 服务同时出现高 CPU 与频繁 GC 停顿",
+    "description": "ad 服务同时命中持续高 CPU（adHighCpu）与周期性手动 GC（adManualGc）两个故障开关，CPU 使用率长期贴近上限、且叠加周期性 GC 停顿导致延迟毛刺更密集，属于同一服务上的复合资源型故障，无代码发版。"
+  },
+  "startsAt": "2026-07-12T04:31:00Z",
+  "scenario_hint": "[flagd组合/多点] flags=adHighCpu+adManualGc：多个 flagd 故障开关同时注入构造的复合 resource 场景"
+}

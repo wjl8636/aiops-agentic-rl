@@ -1,0 +1,63 @@
+{
+  "alert": {
+    "alertname": "MockFabricatedEvidence",
+    "service": "checkout",
+    "labels": {
+      "service": "checkout",
+      "severity": "critical",
+      "job": "checkout"
+    },
+    "annotations": {
+      "summary": "checkout 错误率上升",
+      "description": "checkout 服务错误率上升。"
+    },
+    "startsAt": "2026-06-20T13:00:00Z"
+  },
+  "alert_id": "mock_fail_evidence",
+  "steps": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "checkout   Up 1 hour (healthy)",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ],
+  "final_diagnosis": {
+    "summary": "checkout 数据库连接池耗尽。",
+    "kind": "resource",
+    "suspect_service": "checkout",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "online_op",
+    "remediation_detail": "已重启 checkout。",
+    "confidence": 0.7,
+    "evidence": [
+      "kubectl top 显示 checkout 数据库连接池占用 100%，触发连接超时"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "feishu_online_op",
+  "post_action_health": {
+    "checked": true,
+    "healthy": true,
+    "metric": "http_error_rate",
+    "window_s": 60
+  },
+  "meta": {
+    "source": "mock",
+    "degraded": null,
+    "raw": null
+  }
+}

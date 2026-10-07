@@ -1,0 +1,13 @@
+{
+  "alertname": "MysteriousInternetSlowdown",
+  "service": "unknown",
+  "labels": {
+    "severity": "warning"
+  },
+  "annotations": {
+    "summary": "偶发的外部网络抖动导致部分请求超时",
+    "description": "运营商公网链路偶发抖动，导致部分请求超时，没有对应任何本地服务或已知故障注入钩子，属于依赖外部网络的偶发故障，无法在本地 fixture 环境里稳定复现。"
+  },
+  "startsAt": "2026-06-20T12:00:00Z",
+  "scenario_hint": "不可复现类：依赖外部网络的偶发故障"
+}

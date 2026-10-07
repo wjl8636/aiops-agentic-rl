@@ -1,0 +1,15 @@
+{
+  "alertname": "MemberPriceMismatchWithNoise",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "会员价差一分钱的投诉（伴随若干无关线索）",
+    "description": "财务与客服都反馈会员价在折扣边界上差一分钱的问题（.5 分边界一律向下少 1 分，会员价功能最近合并进 master 上线）。附加信息（可能有误，请自行核实）：同期 payment 网关好像有偶发抖动，quote 服务的延迟也偏高，群里有人猜测是支付/报价链路的问题；也有人怀疑是前端金额格式化显示问题。请 Agent 自行核对指标与代码，不要被这些猜测带偏，定位真正的根因。"
+  },
+  "startsAt": "2026-09-07T18:25:00Z",
+  "scenario_hint": "[v9增强/D3_对抗误导] suspect_file=pricing.py：叙事混入 ad/kafka/payment/quote 等误导线索，真根因在 recommendation 的 master 新文件——验证「仍正确定位真根因服务与文件」"
+}

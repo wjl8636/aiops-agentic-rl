@@ -1,0 +1,225 @@
+{
+  "alert": {
+    "alertname": "DependencyFailureRate",
+    "service": "product-catalog",
+    "labels": {
+      "service": "product-catalog",
+      "severity": "critical",
+      "job": "product-catalog"
+    },
+    "annotations": {
+      "summary": "product-catalog 依赖调用错误率上升",
+      "description": "一次功能开关变更（productCatalogFailure）之后，product-catalog（product-catalog 服务对特定商品返回失败）开始对上游调用方返回失败/超时。上游服务的请求成功率随之下降，错误集中出现在依赖 product-catalog 的那部分调用路径上，没有伴随代码发版。"
+    },
+    "startsAt": "2026-07-01T15:45:00Z",
+    "scenario_hint": "[参数化扩增/dependency] flag=productCatalogFailure service=product-catalog severity=critical：验证依赖故障场景在不同服务/severity/时间窗下的泛化"
+  },
+  "alert_id": "seed_0010_parametrized_dependency",
+  "steps": [
+    {
+      "tool_name": "Skill",
+      "tool_input": {
+        "skill": "dependency-error"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Launching skill: dependency-error",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/productCatalogFailure' -H 'Content-Type: application/json' -d '{}'",
+        "description": "Query current value of productCatalogFailure feature flag via OFREP"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"value\":true,\"key\":\"productCatalogFailure\",\"reason\":\"STATIC\",\"variant\":\"on\",\"metadata\":{}}",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s \"http://localhost:16686/jaeger/ui/api/services\"",
+        "description": "List services known to Jaeger"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"data\":[\"flagd\",\"recommendation\",\"ad\",\"jaeger-all-in-one\",\"fraud-detection\",\"load-generator\"],\"total\":6,\"limit\":0,\"offset\":0,\"errors\":null}",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps -a --filter name=product-catalog",
+        "description": "Check product-catalog container status"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "CONTAINER ID   IMAGE                                                        COMMAND               CREATED       STATUS       PORTS                                           NAMES\n0b3b4001c846   ghcr.nju.edu.cn/open-telemetry/demo:latest-product-catalog   \"./product-catalog\"   2 weeks ago   Up 2 weeks   0.0.0.0:32873->3550/tcp, [::]:32873->3550/tcp   product-catalog",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs product-catalog --tail 100 2>&1 | tail -100",
+        "description": "Check product-catalog logs"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "time=\"2026-09-05T08:16:37Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:16:37Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:16:47Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:16:47Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:16:57Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:16:57Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:17:07Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:17:07Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:17:17Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:17:17Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:17:27Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:17:27Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:17:37Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:17:37Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:17:47Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:17:47Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:17:57Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:17:57Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:18:07Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:18:07Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:18:17Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:18:17Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:18:27Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:18:27Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:18:37Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:18:37Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:18:47Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:18:47Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:18:57Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:18:57Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:19:07Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:19:07Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:19:17Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:19:17Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:19:27Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:19:27Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:19:37Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:19:37Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:19:47Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:19:47Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:19:57Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:19:57Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:20:07Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:20:07Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:20:17Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:20:17Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:20:27Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:20:27Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:20:37Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:20:37Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:20:47Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:20:47Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:20:57Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:20:57Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:21:07Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:21:07Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:21:17Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:21:17Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:21:27Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:21:27Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:21:37Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:21:37Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:21:47Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:21:47Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:21:57Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:21:57Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:22:07Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:22:07Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:22:17Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:22:17Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:22:27Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:22:27Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:22:37Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:22:37Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:22:47Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:22:47Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:22:57Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:22:57Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:23:07Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:23:07Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:23:17Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:23:17Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:23:27Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:23:27Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:23:37Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:23:37Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:23:47Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:23:47Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:23:57Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:23:57Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:24:07Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:24:07Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:24:17Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:24:17Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:24:27Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:24:27Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:24:37Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:24:37Z\" level=info msg=\"Loaded 10 products\"\ntime=\"2026-09-05T08:24:47Z\" level=info msg=\"Reloading Product Catalog...\"\ntime=\"2026-09-05T08:24:47Z\" level=info msg=\"Loaded 10 products\"",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -sg 'http://localhost:16686/jaeger/ui/api/traces?service=recommendation&tags={\"error\":\"true\"}&lookback=1h&limit=10'",
+        "description": "Query Jaeger for error traces from recommendation service"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "<persisted-output>\nOutput too large (34.1KB). Full output saved to: /Users/user/.cc-mirror/codewiz-cc/config/projects/-Users-user-projects-side-project-learn-agent-with-huainan-aiops-agentic-rl-AIops-agent/1a5b8daf-81f8-43ac-9e4b-a9b7e7e4afc9/tool-results/bidotfw47.txt\n\nPreview (first 2KB):\n{\"data\":[{\"traceID\":\"aceefdfd2aa335d1a44bfdcfb1868020\",\"spans\":[{\"traceID\":\"aceefdfd2aa335d1a44bfdcfb1868020\",\"spanID\":\"d278ced0c5f99018\",\"operationName\":\"/flagd.evaluation.v2.Service/EventStream\",\"references\":[],\"startTime\":1788596572650687,\"duration\":9891,\"tags\":[{\"key\":\"error\",\"type\":\"bool\",\"value\":true},{\"key\":\"otel.scope.name\",\"type\":\"string\",\"value\":\"opentelemetry.instrumentation.grpc\"},{\"key\":\"otel.scope.version\",\"type\":\"string\",\"value\":\"0.64b0\"},{\"key\":\"otel.status_code\",\"type\":\"string\",\"value\":\"ERROR\"},{\"key\":\"otel.status_description\",\"type\":\"string\",\"value\":\"_MultiThreadedRendezvous: \\u003c_MultiThreadedRendezvous of RPC that terminated with:\\n\\tstatus = StatusCode.UNIMPLEMENTED\\n\\tdetails = \\\"Received http2 header with status: 404\\\"\\n\\tdebug_error_string = \\\"UNIMPLEMENTED:Received http2 header with status: 404\\\"\\n\\u003e\"},{\"key\":\"rpc.grpc.status_code\",\"type\":\"int64\",\"value\":12},{\"key\":\"rpc.method\",\"type\":\"string\",\"value\":\"EventStream\"},{\"key\":\"rpc.service\",\"type\":\"string\",\"value\":\"flagd.evaluation.v2.Service\"},{\"key\":\"rpc.system\",\"type\":\"string\",\"value\":\"grpc\"},{\"key\":\"span.kind\",\"type\":\"string\",\"value\":\"client\"}],\"logs\":[{\"timestamp\":1788596572660549,\"fields\":[{\"key\":\"event\",\"type\":\"string\",\"value\":\"exception\"},{\"key\":\"exception.escaped\",\"type\":\"string\",\"value\":\"False\"},{\"key\":\"exception.message\",\"type\":\"string\",\"value\":\"\\u003c_MultiThreadedRendezvous of RPC that terminated with:\\n\\tstatus = StatusCode.UNIMPLEMENTED\\n\\tdetails = \\\"Received http2 header with status: 404\\\"\\n\\tdebug_error_string = \\\"UNIMPLEMENTED:Received http2 header with status: 404\\\"\\n\\u003e\"},{\"key\":\"exception.stacktrace\",\"type\":\"string\",\"value\":\"Traceback (most recent call last):\\n  File \\\"/venv/lib/python3.14/site-packages/opentelemetry/trace/__init__.py\\\", line 608, in use_span\\n    yield span\\n  File \\\"/venv/lib/python3.14/site-packages/opentelemetry/sdk/trace/__init__.py\\\", line 1177, in start_as_current_span\\n    yield span\\n  File \\\"/venv/lib/python3.14/site-packages/opentelemetr\n...\n</persisted-output>",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s --data-urlencode 'query=traces_span_metrics_calls_total{service_name=\"recommendation\",status_code=\"STATUS_CODE_ERROR\"}' 'http://localhost:9090/api/v1/query'",
+        "description": "Query Prometheus for error calls from recommendation service"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"instance\":\"fdb7d0d0-efe4-43cf-8532-fc89d57e8bb6\",\"job\":\"opentelemetry-demo/recommendation\",\"service_instance_id\":\"fdb7d0d0-efe4-43cf-8532-fc89d57e8bb6\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788596690.036,\"24\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"instance\":\"b958cf4b-b065-4438-b4dc-8740326215e9\",\"job\":\"opentelemetry-demo/recommendation\",\"service_instance_id\":\"b958cf4b-b065-4438-b4dc-8740326215e9\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788596690.036,\"236\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"instance\":\"d6cadd2a-7d73-4575-8746-b1d66fb94c56\",\"job\":\"opentelemetry-demo/recommendation\",\"service_instance_id\":\"d6cadd2a-7d73-4575-8746-b1d66fb94c56\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788596690.036,\"84\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"instance\":\"fc79edad-fe97-48da-92ad-52e542858bf3\",\"job\":\"opentelemetry-demo/recommendation\",\"service_instance_id\":\"fc79edad-fe97-48da-92ad-52e542858bf3\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788596690.036,\"71\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"instance\":\"db68c960-9ecc-4858-a8fd-99c34a4bc967\",\"job\":\"opentelemetry-demo/recommendation\",\"service_instance_id\":\"db68c960-9ecc-4858-a8fd-99c34a4bc967\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788596690.036,\"57\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"instance\":\"4487af01-8e63-4a65-a31c-795b37e4d089\",\"job\":\"opentelemetry-demo/recommendation\",\"service_instance_id\":\"4487af01-8e63-4a65-a31c-795b37e4d089\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788596690.036,\"102\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"instance\":\"7f259e41-9808-4fce-b5f9-07e7b2a16d67\",\"job\":\"opentelemetry-demo/recommendation\",\"service_instance_id\":\"7f259e41-9808-4fce-b5f9-07e7b2a16d67\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788596690.036,\"20\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"instance\":\"2efaae34-47b5-465c-8dfa-ca0bbfdcf0cd\",\"job\":\"opentelemetry-demo/recommendation\",\"service_instance_id\":\"2efaae34-47b5-465c-8dfa-ca0bbfdcf0cd\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788596690.036,\"12454\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"instance\":\"1f04e325-19f0-43b3-965b-064554fd53d0\",\"job\":\"opentelemetry-demo/recommendation\",\"service_instance_id\":\"1f04e325-19f0-43b3-965b-064554fd53d0\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788596690.036,\"75\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"instance\":\"a3bb0502-d8e5-490d-86e4-5d055ddc3721\",\"job\":\"opentelemetry-demo/recommendation\",\"service_instance_id\":\"a3bb0502-d8e5-490d-86e4-5d055ddc3721\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788596690.036,\"21\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"instance\":\"5c4790e1-3572-47db-bf52-9319e62eb665\",\"job\":\"opentelemetry-demo/recommendation\",\"service_instance_id\":\"5c4790e1-3572-47db-bf52-9319e62eb665\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788596690.036,\"69\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"instance\":\"3587df9d-c928-47b4-b2d2-56e246b5f3a5\",\"job\":\"opentelemetry-demo/recommendation\",\"service_instance_id\":\"3587df9d-c928-47b4-b2d2-56e246b5f3a5\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788596690.036,\"2226\"]}]}}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd workspace/product-catalog 2>/dev/null && rg -n \"productCatalogFailure\" -i . 2>/dev/null | head -50; echo \"---git log---\"; git log --oneline -10 2>/dev/null",
+        "description": "Search product-catalog source for the flag usage"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "---git log---\n9891541 为 agentic rl 做准备\n51ef1c6 Diagnosis: add optional suspect_repo/commit/file hints for code-fix handoff\ncb64ed6 完善测评\n9c5368c 增加更多测评用例\n73f462b 增加 quick start\nc02daf3 增加license\n9ec18e1 feat: 实现 AIOps 根因诊断 Agent 完整代码\nb466ad6 Initial commit: AIOps Agent 技术方案",
+      "signal_types_covered": [
+        "git_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -sg 'http://localhost:16686/jaeger/ui/api/traces?service=recommendation&operation=oteldemo.ProductCatalogService/GetProduct&lookback=1h&limit=5' | head -c 3000",
+        "description": "Query Jaeger for recommendation calling product-catalog GetProduct"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"data\":[],\"total\":0,\"limit\":0,\"offset\":0,\"errors\":null}",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "ls workspace/ 2>/dev/null; echo \"---\"; pwd",
+        "description": "List workspace directory contents"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "recommendation\n---\naiops-agentic-rl/AIops-agent",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "product-catalog 服务的功能开关 productCatalogFailure 当前被设置为 on（true），这是一个已知的混沌工程/故障注入类开关：开启后 ProductCatalogService.GetProduct 会对特定商品 ID 的请求返回错误，导致所有依赖 product-catalog 的上游调用方（如 recommendation/checkout/frontend）在查询该商品时收到失败/超时，从而表现为上游成功率下降。product-catalog 容器本身运行正常（已持续运行 2 周，无重启、无 OOM、日志无异常报错，只有正常的商品目录周期性 reload 日志），且没有伴随代码发版，与告警描述完全吻合：根因是功能开关配置变更，不是代码缺陷或资源/依赖组件故障。由于该止血动作（关闭 flagd 中的 productCatalogFailure 开关）不属于当前白名单的低风险处置命令（仅限 docker restart/recreate/update --cpus,--memory），且 product-catalog 也不在被授权的自动处置目标列表内，因此未执行任何自动操作,建议人工/配置管理系统将该 flag 改回 off。",
+        "kind": "config",
+        "suspect_service": "product-catalog",
+        "suspect_repo": null,
+        "suspect_commit_hint": null,
+        "suspect_file_hint": null,
+        "remediation_type": "online_op",
+        "remediation_detail": "建议人工操作：将 flagd 中的功能开关 productCatalogFailure 从 on(true) 改回 off(false)（配置回滚，非代码修复）。未自动执行的原因：(1) 该操作是修改 flagd 的 flag 配置，不属于当前处置白名单枚举的三种命令形态（restart_instance/migrate_instance/scale_resources 均为 docker 容器操作，不包含 flag 配置写入）；(2) product-catalog 也不在被授权自动处置的实例清单（ad/cart/checkout/currency/email/frontend/payment/quote/recommendation/shipping）内。因此本次只做诊断，不做自动止血，需要人工或专门的 flag 管理系统介入关闭该开关；关闭后应观察 product-catalog 错误率与上游成功率是否恢复。",
+        "confidence": 0.85,
+        "evidence": [
+          "OFREP 实时查询: curl -X POST http://localhost:8016/ofrep/v1/evaluate/flags/productCatalogFailure 返回 {\"value\":true,\"key\":\"productCatalogFailure\",\"reason\":\"STATIC\",\"variant\":\"on\"} —— 确认该开关当前确实处于开启状态，与告警描述的'功能开关变更（productCatalogFailure）'直接对应",
+          "docker ps -a --filter name=product-catalog: 容器已连续运行 2 周（Up 2 weeks），未发生重启，说明本次故障不是容器崩溃/OOM/新发版引起，与告警描述'没有伴随代码发版'一致",
+          "docker logs product-catalog --tail 100: 全部是周期性的正常业务日志 'Reloading Product Catalog...' / 'Loaded 10 products'，没有任何 error/panic/exception 级别日志，排除了代码异常崩溃或资源耗尽类根因",
+          "curl Prometheus traces_span_metrics_calls_total{service_name=\"recommendation\",status_code=\"STATUS_CODE_ERROR\"} 及 Jaeger trace aceefdfd2aa335d1a44bfdcfb1868020: 观察到的是 recommendation 到 flagd EventStream 的 gRPC UNIMPLEMENTED(404) 错误，属于与本次 productCatalogFailure 故障路径无关的另一条噪声信号，未作为本次根因证据采信，仅用于排除干扰",
+          "Jaeger services 列表 (http://localhost:16686/jaeger/ui/api/services) 中不包含 product-catalog 独立 trace，本地 workspace/ 目录下也没有克隆 product-catalog 源码（只有 workspace/recommendation），故未能引用具体代码行；根因判定主要依据 OFREP flag 实时值 + 容器健康状态的交叉证据，属于该 OTel Demo 场景下已知的'开关型故障注入'模式（开启后对特定商品 ID 返回错误），与告警描述的现象（'对特定商品返回失败'、'没有伴随代码发版'）完全吻合"
+        ],
+        "also_code_fix": false
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "prometheus",
+        "jaeger",
+        "logs",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ],
+  "final_diagnosis": {
+    "summary": "product-catalog 服务的功能开关 productCatalogFailure 当前被设置为 on（true），这是一个已知的混沌工程/故障注入类开关：开启后 ProductCatalogService.GetProduct 会对特定商品 ID 的请求返回错误，导致所有依赖 product-catalog 的上游调用方（如 recommendation/checkout/frontend）在查询该商品时收到失败/超时，从而表现为上游成功率下降。product-catalog 容器本身运行正常（已持续运行 2 周，无重启、无 OOM、日志无异常报错，只有正常的商品目录周期性 reload 日志），且没有伴随代码发版，与告警描述完全吻合：根因是功能开关配置变更，不是代码缺陷或资源/依赖组件故障。由于该止血动作（关闭 flagd 中的 productCatalogFailure 开关）不属于当前白名单的低风险处置命令（仅限 docker restart/recreate/update --cpus,--memory），且 product-catalog 也不在被授权的自动处置目标列表内，因此未执行任何自动操作,建议人工/配置管理系统将该 flag 改回 off。",
+    "kind": "config",
+    "suspect_service": "product-catalog",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "online_op",
+    "remediation_detail": "建议人工操作：将 flagd 中的功能开关 productCatalogFailure 从 on(true) 改回 off(false)（配置回滚，非代码修复）。未自动执行的原因：(1) 该操作是修改 flagd 的 flag 配置，不属于当前处置白名单枚举的三种命令形态（restart_instance/migrate_instance/scale_resources 均为 docker 容器操作，不包含 flag 配置写入）；(2) product-catalog 也不在被授权自动处置的实例清单（ad/cart/checkout/currency/email/frontend/payment/quote/recommendation/shipping）内。因此本次只做诊断，不做自动止血，需要人工或专门的 flag 管理系统介入关闭该开关；关闭后应观察 product-catalog 错误率与上游成功率是否恢复。",
+    "confidence": 0.85,
+    "evidence": [
+      "OFREP 实时查询: curl -X POST http://localhost:8016/ofrep/v1/evaluate/flags/productCatalogFailure 返回 {\"value\":true,\"key\":\"productCatalogFailure\",\"reason\":\"STATIC\",\"variant\":\"on\"} —— 确认该开关当前确实处于开启状态，与告警描述的'功能开关变更（productCatalogFailure）'直接对应",
+      "docker ps -a --filter name=product-catalog: 容器已连续运行 2 周（Up 2 weeks），未发生重启，说明本次故障不是容器崩溃/OOM/新发版引起，与告警描述'没有伴随代码发版'一致",
+      "docker logs product-catalog --tail 100: 全部是周期性的正常业务日志 'Reloading Product Catalog...' / 'Loaded 10 products'，没有任何 error/panic/exception 级别日志，排除了代码异常崩溃或资源耗尽类根因",
+      "curl Prometheus traces_span_metrics_calls_total{service_name=\"recommendation\",status_code=\"STATUS_CODE_ERROR\"} 及 Jaeger trace aceefdfd2aa335d1a44bfdcfb1868020: 观察到的是 recommendation 到 flagd EventStream 的 gRPC UNIMPLEMENTED(404) 错误，属于与本次 productCatalogFailure 故障路径无关的另一条噪声信号，未作为本次根因证据采信，仅用于排除干扰",
+      "Jaeger services 列表 (http://localhost:16686/jaeger/ui/api/services) 中不包含 product-catalog 独立 trace，本地 workspace/ 目录下也没有克隆 product-catalog 源码（只有 workspace/recommendation），故未能引用具体代码行；根因判定主要依据 OFREP flag 实时值 + 容器健康状态的交叉证据，属于该 OTel Demo 场景下已知的'开关型故障注入'模式（开启后对特定商品 ID 返回错误），与告警描述的现象（'对特定商品返回失败'、'没有伴随代码发版'）完全吻合"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "feishu_online_op",
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"product-catalog 服务的功能开关 productCatalogFailure 当前被设置为 on（true），这是一个已知的混沌工程/故障注入类开关：开启后 ProductCatalogService.GetProduct 会对特定商品 ID 的请求返回错误，导致所有依赖 product-catalog 的上游调用方（如 recommendation/checkout/frontend）在查询该商品时收到失败/超时，从而表现为上游成功率下降。product-catalog 容器本身运行正常（已持续运行 2 周，无重启、无 OOM、日志无异常报错，只有正常的商品目录周期性 reload 日志），且没有伴随代码发版，与告警描述完全吻合：根因是功能开关配置变更，不是代码缺陷或资源/依赖组件故障。由于该止血动作（关闭 flagd 中的 productCatalogFailure 开关）不属于当前白名单的低风险处置命令（仅限 docker restart/recreate/update --cpus,--memory），且 product-catalog 也不在被授权的自动处置目标列表内，因此未执行任何自动操作,建议人工/配置管理系统将该 flag 改回 off。\",\"kind\":\"config\",\"suspect_service\":\"product-catalog\",\"suspect_repo\":null,\"suspect_commit_hint\":null,\"suspect_file_hint\":null,\"remediation_type\":\"online_op\",\"remediation_detail\":\"建议人工操作：将 flagd 中的功能开关 productCatalogFailure 从 on(true) 改回 off(false)（配置回滚，非代码修复）。未自动执行的原因：(1) 该操作是修改 flagd 的 flag 配置，不属于当前处置白名单枚举的三种命令形态（restart_instance/migrate_instance/scale_resources 均为 docker 容器操作，不包含 flag 配置写入）；(2) product-catalog 也不在被授权自动处置的实例清单（ad/cart/checkout/currency/email/frontend/payment/quote/recommendation/shipping）内。因此本次只做诊断，不做自动止血，需要人工或专门的 flag 管理系统介入关闭该开关；关闭后应观察 product-catalog 错误率与上游成功率是否恢复。\",\"confidence\":0.85,\"evidence\":[\"OFREP 实时查询: curl -X POST http://localhost:8016/ofrep/v1/evaluate/flags/productCatalogFailure 返回 {\\\"value\\\":true,\\\"key\\\":\\\"productCatalogFailure\\\",\\\"reason\\\":\\\"STATIC\\\",\\\"variant\\\":\\\"on\\\"} —— 确认该开关当前确实处于开启状态，与告警描述的'功能开关变更（productCatalogFailure）'直接对应\",\"docker ps -a --filter name=product-catalog: 容器已连续运行 2 周（Up 2 weeks），未发生重启，说明本次故障不是容器崩溃/OOM/新发版引起，与告警描述'没有伴随代码发版'一致\",\"docker logs product-catalog --tail 100: 全部是周期性的正常业务日志 'Reloading Product Catalog...' / 'Loaded 10 products'，没有任何 error/panic/exception 级别日志，排除了代码异常崩溃或资源耗尽类根因\",\"curl Prometheus traces_span_metrics_calls_total{service_name=\\\"recommendation\\\",status_code=\\\"STATUS_CODE_ERROR\\\"} 及 Jaeger trace aceefdfd2aa335d1a44bfdcfb1868020: 观察到的是 recommendation 到 flagd EventStream 的 gRPC UNIMPLEMENTED(404) 错误，属于与本次 productCatalogFailure 故障路径无关的另一条噪声信号，未作为本次根因证据采信，仅用于排除干扰\",\"Jaeger services 列表 (http://localhost:16686/jaeger/ui/api/services) 中不包含 product-catalog 独立 trace，本地 workspace/ 目录下也没有克隆 product-catalog 源码（只有 workspace/recommendation），故未能引用具体代码行；根因判定主要依据 OFREP flag 实时值 + 容器健康状态的交叉证据，属于该 OTel Demo 场景下已知的'开关型故障注入'模式（开启后对特定商品 ID 返回错误），与告警描述的现象（'对特定商品返回失败'、'没有伴随代码发版'）完全吻合\"],\"also_code_fix\":false}"
+  }
+}

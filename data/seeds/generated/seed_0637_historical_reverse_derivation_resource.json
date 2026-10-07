@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0041-ad-resource",
+    "description": "ad 服务出现明显的周期性 GC 停顿，跟前面持续型高 CPU 不同，这次是每隔一段时间出现一次延迟毛刺而非持续打满，没有伴随代码发版。"
+  },
+  "startsAt": "2026-07-21T23:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0041-ad-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

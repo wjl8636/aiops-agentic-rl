@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "warning",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "历史工单反演：hist-2025-09-consumer-scale-down",
+    "description": "2025-09 的一次事故：一次误操作把 kafka 消费者组的副本数从 6 缩到了 2，生产速率不变但消费能力骤降，consumer lag 迅速堆积，订单相关下游处理明显滞后。"
+  },
+  "startsAt": "2026-07-22T21:30:00Z",
+  "scenario_hint": "[历史工单反演/static] source_ticket=hist-2025-09-consumer-scale-down：从手写历史工单摘要样例反向抽取的告警（Milvus 检索池不足时的静态兜底）"
+}

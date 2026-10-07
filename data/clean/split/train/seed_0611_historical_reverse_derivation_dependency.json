@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0000-recommendation-dependency",
+    "description": "recommendation 新增了一个离线预计算任务，任务发起的下游查询没有配超时，占满 recommendation 自身线程池，frontend 调用 recommendation 接口出现级联超时。"
+  },
+  "startsAt": "2026-07-21T03:30:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0000-recommendation-dependency：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

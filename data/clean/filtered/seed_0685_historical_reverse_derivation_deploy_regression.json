@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "历史工单反演：hist-2026-01-cache-no-ttl",
+    "description": "2026-01 大促期间的一次事故：recommendation 团队为临时提升缓存命中率手动加了一个全局缓存字典，上线时忘了配 TTL，大促流量下缓存条目越滚越多，服务内存逐步爬升到被 OOMKilled。"
+  },
+  "startsAt": "2026-07-23T11:00:00Z",
+  "scenario_hint": "[历史工单反演/static] source_ticket=hist-2026-01-cache-no-ttl：从手写历史工单摘要样例反向抽取的告警（Milvus 检索池不足时的静态兜底）"
+}

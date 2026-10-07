@@ -1,0 +1,15 @@
+{
+  "alertname": "CatalogPaginationWithNoise",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "分页浏览漏商品的投诉（伴随若干无关线索）",
+    "description": "商品团队反馈分页浏览接口漏内容：按页遍历 /catalog 会跳过目录最前面的商品（分页功能最近合并进 master 上线）。附加信息（可能有误，请自行核实）：同时间段值班群里有人提到ad 服务好像有零星波动，也有人怀疑 kafka 消费有堆积，不确定跟这个问题是否相关；上周另一次排查时发现过一个前端静态资源缓存的问题，也可能有关。请 Agent 自行核对指标与代码，不要被这些次生描述带偏，定位真正的根因。"
+  },
+  "startsAt": "2026-09-07T15:05:00Z",
+  "scenario_hint": "[v9增强/D3_对抗误导] suspect_file=pagination.py：叙事混入 ad/kafka/payment/quote 等误导线索，真根因在 recommendation 的 master 新文件——验证「仍正确定位真根因服务与文件」"
+}

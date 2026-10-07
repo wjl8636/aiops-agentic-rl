@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "warning",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0046-kafka-resource",
+    "description": "告警声称 orders topic 消费 lag 单调上升（flagd kafkaQueueProblems 触发、生产快于消费）。实时核验显示：flagd 运行时评估 kafkaQueueProblems 确为 variant=on/value=100（与本告警多条历史相似工单中\"flag 仍为 off\"不同，本次故障注入确已启用），kafka/fraud-detection/accounting/checkout 等容器均在运行（非历史工单中的\"未部署\"场景）。但过去 1 小时内 Prometheus 的 kafka_consumer_records_lag{topic=\"orders\"}、kafka_lag_max 全程恒为 0（60 个采样点无一非零），fraud-detection 消费者 kafka_consumer_last_poll_seconds_ago=0（刚完成一次轮询，健康）、kafka_consumer_records_consumed_rate 与生产速率 kafka_message_count_total 的 rate 均稳定在约 0.2 msg/s（~12/min），无突增或掉底；broker 侧 Produce purgatory=0、request_queue=0，Fetch purgatory=792 属正常长轮询水位；fraud-detection 容器日志无报错/卡死迹象。告警 startsAt=2026-06-20T10:10:00Z 与当前容器生命周期（均 Up ~4小时，即约 2026-08-18T08:03 启动）相差近两个月，时间线不吻合。综合判断：即便本次 flagd 故障注入名义上已开启，当前低流量下并未观测到真实的、正在发生的队列积压，告警描述的\"lag 单调上升\"不成立，属于陈旧/未在当前生命周期内实际产生可观测影响的告警，不具备执行止血的证据基础，也没有需要止血的实际积压。"
+  },
+  "startsAt": "2026-07-22T01:15:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0046-kafka-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

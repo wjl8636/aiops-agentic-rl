@@ -1,0 +1,15 @@
+{
+  "alertname": "FlagdMechanicalCombo_productCatalogFailure_adManualGc_loadGeneratorFloodHomepage",
+  "service": "product-catalog",
+  "labels": {
+    "service": "product-catalog",
+    "severity": "critical",
+    "job": "product-catalog"
+  },
+  "annotations": {
+    "summary": "ad/frontend/product-catalog 同时命中 3 个 flagd 故障开关",
+    "description": "同一时间窗口内命中 3 个 flagd 故障开关：productCatalogFailure（product-catalog 服务对特定商品返回失败）；adManualGc（ad 服务被强制触发完整的手动 GC）；loadGeneratorFloodHomepage（对 frontend 首页灌入大量请求造成流量型过载）。涉及服务：ad、frontend、product-catalog。这条组合来自对 CONFIRMED_FLAGD_FLAGS 做 itertools.combinations(r=3) 的机械遍历，过滤掉同服务互斥/过量 hard-down 组合后剩下的候选，用来扩大 flagd_combination 路径的组合多样性，不是手写的定制叙事。"
+  },
+  "startsAt": "2026-07-12T13:30:00Z",
+  "scenario_hint": "[flagd组合/多点] flags=productCatalogFailure+adManualGc+loadGeneratorFloodHomepage：多个 flagd 故障开关同时注入构造的复合 resource 场景"
+}

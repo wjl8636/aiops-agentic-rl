@@ -1,0 +1,15 @@
+{
+  "alertname": "OrdersBacklogWithAdDegradation",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "critical",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "orders 积压快速增长，同期 ad 延迟也有劣化",
+    "description": "orders topic 消费积压快速增长（怀疑 kafkaQueueProblems 开关注入了消费延迟），同一时段ad 服务延迟也出现劣化（怀疑 adHighCpu 开关也被打开）。两条故障疑似来自同一次误操作，订单履约与广告收入同时受影响。请分别核实两个开关状态，优先处置积压问题。"
+  },
+  "startsAt": "2026-09-07T14:55:00Z",
+  "scenario_hint": "[v9增强/B1a_交叉验证] flags=kafkaQueueProblems+adHighCpu：注入真实故障但观测信号降级（Prometheus lag 冻结/ad 机制不生效/后端不可观测），OFREP 是权威第一信源——验证「OFREP 查 flag → Prometheus 读数正常不据此否定 → 换第二信源交叉验证 → 收敛输出 kind/route/confidence，不执行白名单外操作」"
+}

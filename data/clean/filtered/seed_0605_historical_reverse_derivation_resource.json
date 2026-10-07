@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0051-recommendation-resource",
+    "description": "recommendation 服务(镜像 recommendation:f18f452，deploys.log 标记 LATEST_DEPLOY suspect)存在无界内存缓存 _seen_product_ids(list 无上限 append)，在服务自身后台压测线程持续调用下 RSS 单调上升导致 OOMKilled/推荐接口503。已执行低风险止血 docker restart 恢复服务；根治需合并已准备好的代码修复(deque(maxlen=500)限界缓存)。"
+  },
+  "startsAt": "2026-07-20T23:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0051-recommendation-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

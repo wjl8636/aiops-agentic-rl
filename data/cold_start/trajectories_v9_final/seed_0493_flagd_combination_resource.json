@@ -1,0 +1,304 @@
+{
+  "alert": {
+    "alertname": "AdServiceCompoundResourcePressure",
+    "service": "ad",
+    "labels": {
+      "service": "ad",
+      "severity": "critical",
+      "job": "adservice"
+    },
+    "annotations": {
+      "summary": "ad 服务同时出现高 CPU 与频繁 GC 停顿",
+      "description": "ad 服务同时命中持续高 CPU（adHighCpu）与周期性手动 GC（adManualGc）两个故障开关，CPU 使用率长期贴近上限、且叠加周期性 GC 停顿导致延迟毛刺更密集，属于同一服务上的复合资源型故障，无代码发版。"
+    },
+    "startsAt": "2026-07-11T10:11:00Z",
+    "scenario_hint": "[flagd组合/多点] flags=adHighCpu+adManualGc：多个 flagd 故障开关同时注入构造的复合 resource 场景"
+  },
+  "alert_id": "seed_0493_flagd_combination_resource",
+  "final_diagnosis": {
+    "summary": "ad 服务的 flagd 功能开关 adHighCpu、adManualGc 当前均为 on（OFREP 实时值，reason=STATIC），与告警描述的\"两个故障开关同时命中\"完全吻合，属于故障注入类的配置误留，而非代码发版或真实流量驱动的资源瓶颈。但检查时刻的实时遥测（jvm_cpu_recent_utilization_ratio 近6h在0.04%~0.15%区间、jvm_gc_duration_seconds_count 6h内minor GC仅+2次、major GC计数0增长、p99延迟47.75ms、docker stats CPU 1.10%、RestartCount=0、OOMKilled=false）并未显示当前有实际的高CPU/频繁GC压力，且当前流量极低（calls rate≈0.083/s）。容器StartedAt=2026-08-18，晚于告警startsAt(2026-07-11)，说明该告警很可能是历史/陈旧告警或针对开关早前状态的告警，当前实例下故障效应尚未（或不再）显著显现，可能与开关效果依赖请求量有关。根因判定为 flagd 配置(故障注入开关未复位)，非代码问题；修复应在 flagd 侧将 adHighCpu、adManualGc 两个开关切回 off/默认 variant，该操作不在当前 docker 白名单(restart_instance/migrate_instance/scale_resources)覆盖范围内，故未自动执行任何处置;鉴于当前实时资源指标均正常，也没有对 ad 容器执行重启/扩容等止血动作(无证据支撑该动作必要且它也无法关闭该开关)。",
+    "kind": "config",
+    "suspect_service": "ad",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "online_op",
+    "remediation_detail": "未自动执行任何处置。根因是 flagd 功能开关 adHighCpu、adManualGc 被置为 on（故障注入/演练开关未复位），需要人工在 flagd 侧将这两个开关的 defaultVariant 改回 off（或对应的关闭 variant）并让 flagd 热加载生效，这是解除该复合资源压力的直接手段。该操作是修改 flagd 配置，不属于当前授权的低风险白名单命令形态（仅覆盖 docker restart / compose recreate / docker update 三种针对容器实例的操作），因此系统 hook 不会放行、也不应尝试。同时，检查时刻的实时指标（jvm_cpu_recent_utilization_ratio 近6小时维持在0.04%~0.15%、GC minor计数6小时仅新增2次、major GC无增长、p99延迟47.75ms、docker stats CPU 1.10%、RestartCount=0、OOMKilled=false）显示 ad 容器当前并无真实的高CPU或GC压力，因此也没有对 ad 容器执行 restart/scale 等白名单内的止血动作——现状不支持、也不需要这类操作。建议：(1) 人工确认此故障注入实验是否应该关闭，若是则复位 adHighCpu/adManualGc 两个开关；(2) 若流量后续上升导致实际压力显现，可再评估是否需要 scale_resources 对 ad 临时抬高 CPU/内存上限作为流量增大时的缓冲。",
+    "confidence": 0.78,
+    "evidence": [
+      "OFREP: POST http://localhost:8016/ofrep/v1/evaluate/flags/adHighCpu -> {\"value\":true,\"variant\":\"on\",\"reason\":\"STATIC\"}，与告警描述的 adHighCpu 完全吻合",
+      "OFREP: POST http://localhost:8016/ofrep/v1/evaluate/flags/adManualGc -> {\"value\":true,\"variant\":\"on\",\"reason\":\"STATIC\"}，与告警描述的 adManualGc 完全吻合",
+      "PromQL: jvm_cpu_recent_utilization_ratio{service_name=\"ad\"} 近6h(step120s,n=88) min=0.00039 max=0.00154 avg=0.00069，未见CPU长期贴近上限",
+      "PromQL: jvm_gc_duration_seconds_count{service_name=\"ad\"} 近6h minor GC从409增至411(仅+2)，major GC恒为1(无新增)，未见频繁GC",
+      "PromQL: sum(rate(traces_span_metrics_calls_total{service_name=\"ad\"}[10m]))=0.083 req/s，当前流量极低",
+      "PromQL: histogram_quantile(0.99, ...duration_milliseconds_bucket{service_name=\"ad\"}...)=47.75ms，p99延迟正常，未见毛刺",
+      "docker stats --no-stream ad: CPU 1.10%, MEM 244.2MiB/300MiB(81.39%)",
+      "docker inspect ad: RestartCount=0, OOMKilled=false, StartedAt=2026-08-18T08:12:30Z（晚于告警startsAt 2026-07-11，提示告警可能针对更早状态或该实例重启后压力未再现）",
+      "repo grep: scripts/inject.sh 中 s2 场景通过 flip_flag 修改 vendor/otel-demo/src/flagd/demo.flagd.json 将 adHighCpu.defaultVariant 置为 on 来注入本故障，佐证该告警是flagd故障注入类而非代码缺陷或真实流量驱动",
+      "search_past_incidents(\"ad service 高 CPU 频繁 GC 停顿 复合资源型故障 adHighCpu adManualGc\") 未检索到历史相似工单，无可复用处置经验"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "feishu_online_op",
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"ad 服务的 flagd 功能开关 adHighCpu、adManualGc 当前均为 on（OFREP 实时值，reason=STATIC），与告警描述的\\\"两个故障开关同时命中\\\"完全吻合，属于故障注入类的配置误留，而非代码发版或真实流量驱动的资源瓶颈。但检查时刻的实时遥测（jvm_cpu_recent_utilization_ratio 近6h在0.04%~0.15%区间、jvm_gc_duration_seconds_count 6h内minor GC仅+2次、major GC计数0增长、p99延迟47.75ms、docker stats CPU 1.10%、RestartCount=0、OOMKilled=false）并未显示当前有实际的高CPU/频繁GC压力，且当前流量极低（calls rate≈0.083/s）。容器StartedAt=2026-08-18，晚于告警startsAt(2026-07-11)，说明该告警很可能是历史/陈旧告警或针对开关早前状态的告警，当前实例下故障效应尚未（或不再）显著显现，可能与开关效果依赖请求量有关。根因判定为 flagd 配置(故障注入开关未复位)，非代码问题；修复应在 flagd 侧将 adHighCpu、adManualGc 两个开关切回 off/默认 variant，该操作不在当前 docker 白名单(restart_instance/migrate_instance/scale_resources)覆盖范围内，故未自动执行任何处置;鉴于当前实时资源指标均正常，也没有对 ad 容器执行重启/扩容等止血动作(无证据支撑该动作必要且它也无法关闭该开关)。\",\"kind\":\"config\",\"suspect_service\":\"ad\",\"suspect_repo\":null,\"suspect_commit_hint\":null,\"suspect_file_hint\":null,\"remediation_type\":\"online_op\",\"remediation_detail\":\"未自动执行任何处置。根因是 flagd 功能开关 adHighCpu、adManualGc 被置为 on（故障注入/演练开关未复位），需要人工在 flagd 侧将这两个开关的 defaultVariant 改回 off（或对应的关闭 variant）并让 flagd 热加载生效，这是解除该复合资源压力的直接手段。该操作是修改 flagd 配置，不属于当前授权的低风险白名单命令形态（仅覆盖 docker restart / compose recreate / docker update 三种针对容器实例的操作），因此系统 hook 不会放行、也不应尝试。同时，检查时刻的实时指标（jvm_cpu_recent_utilization_ratio 近6小时维持在0.04%~0.15%、GC minor计数6小时仅新增2次、major GC无增长、p99延迟47.75ms、docker stats CPU 1.10%、RestartCount=0、OOMKilled=false）显示 ad 容器当前并无真实的高CPU或GC压力，因此也没有对 ad 容器执行 restart/scale 等白名单内的止血动作——现状不支持、也不需要这类操作。建议：(1) 人工确认此故障注入实验是否应该关闭，若是则复位 adHighCpu/adManualGc 两个开关；(2) 若流量后续上升导致实际压力显现，可再评估是否需要 scale_resources 对 ad 临时抬高 CPU/内存上限作为流量增大时的缓冲。\",\"confidence\":0.78,\"evidence\":[\"OFREP: POST http://localhost:8016/ofrep/v1/evaluate/flags/adHighCpu -> {\\\"value\\\":true,\\\"variant\\\":\\\"on\\\",\\\"reason\\\":\\\"STATIC\\\"}，与告警描述的 adHighCpu 完全吻合\",\"OFREP: POST http://localhost:8016/ofrep/v1/evaluate/flags/adManualGc -> {\\\"value\\\":true,\\\"variant\\\":\\\"on\\\",\\\"reason\\\":\\\"STATIC\\\"}，与告警描述的 adManualGc 完全吻合\",\"PromQL: jvm_cpu_recent_utilization_ratio{service_name=\\\"ad\\\"} 近6h(step120s,n=88) min=0.00039 max=0.00154 avg=0.00069，未见CPU长期贴近上限\",\"PromQL: jvm_gc_duration_seconds_count{service_name=\\\"ad\\\"} 近6h minor GC从409增至411(仅+2)，major GC恒为1(无新增)，未见频繁GC\",\"PromQL: sum(rate(traces_span_metrics_calls_total{service_name=\\\"ad\\\"}[10m]))=0.083 req/s，当前流量极低\",\"PromQL: histogram_quantile(0.99, ...duration_milliseconds_bucket{service_name=\\\"ad\\\"}...)=47.75ms，p99延迟正常，未见毛刺\",\"docker stats --no-stream ad: CPU 1.10%, MEM 244.2MiB/300MiB(81.39%)\",\"docker inspect ad: RestartCount=0, OOMKilled=false, StartedAt=2026-08-18T08:12:30Z（晚于告警startsAt 2026-07-11，提示告警可能针对更早状态或该实例重启后压力未再现）\",\"repo grep: scripts/inject.sh 中 s2 场景通过 flip_flag 修改 vendor/otel-demo/src/flagd/demo.flagd.json 将 adHighCpu.defaultVariant 置为 on 来注入本故障，佐证该告警是flagd故障注入类而非代码缺陷或真实流量驱动\",\"search_past_incidents(\\\"ad service 高 CPU 频繁 GC 停顿 复合资源型故障 adHighCpu adManualGc\\\") 未检索到历史相似工单，无可复用处置经验\"],\"also_code_fix\":false}",
+    "pruning": {
+      "steps_before": 16,
+      "steps_after": 15,
+      "removed": [
+        {
+          "step_index_1based": 15,
+          "tool_name": "Bash",
+          "reason": "no-signal-no-fact",
+          "command_snippet": "date -u +%Y-%m-%dT%H:%M:%SZ"
+        }
+      ],
+      "restored_by_verification": []
+    }
+  },
+  "steps": [
+    {
+      "tool_name": "Skill",
+      "tool_input": {
+        "skill": "resource-cpu"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Launching skill: resource-cpu",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/adHighCpu' -H 'Content-Type: application/json' -d '{}'; echo; curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/adManualGc' -H 'Content-Type: application/json' -d '{}'; echo",
+        "description": "Check flagd values for adHighCpu and adManualGc flags"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"value\":true,\"key\":\"adHighCpu\",\"reason\":\"STATIC\",\"variant\":\"on\",\"metadata\":{}}\n{\"value\":true,\"key\":\"adManualGc\",\"reason\":\"STATIC\",\"variant\":\"on\",\"metadata\":{}}",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps --filter \"name=ad\" --format '{{.Names}}\\t{{.Status}}'; echo ---; docker stats --no-stream --filter \"name=ad\" 2>/dev/null",
+        "description": "Check ad service container status and resource usage"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Exit code 125\nload-generator\tUp About an hour\nad\tUp 2 weeks\n---",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker stats --no-stream ad 2>&1",
+        "description": "Check ad container resource usage"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "CONTAINER ID   NAME      CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O       PIDS\nb25f17aecb4f   ad        1.10%     244.2MiB / 300MiB   81.39%    63.9MB / 422MB   246kB / 445MB   38",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s --data-urlencode 'query={service_name=\"ad\"}' 'http://localhost:9090/api/v1/query' | python3 -c \"import sys,json; d=json.load(sys.stdin); names=sorted(set(r['metric']['__name__'] for r in d['data']['result'])); print('\\n'.join(names))\"",
+        "description": "List available Prometheus metric names for ad service"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "demo_ad_requests_total\njvm_class_count\njvm_class_loaded_total\njvm_class_unloaded_total\njvm_cpu_count\njvm_cpu_recent_utilization_ratio\njvm_cpu_time_seconds_total\njvm_gc_duration_seconds_bucket\njvm_gc_duration_seconds_count\njvm_gc_duration_seconds_sum\njvm_memory_committed_bytes\njvm_memory_limit_bytes\njvm_memory_used_after_last_gc_bytes\njvm_memory_used_bytes\njvm_thread_count\notel_sdk_metric_reader_collection_duration_seconds_bucket\notel_sdk_metric_reader_collection_duration_seconds_count\notel_sdk_metric_reader_collection_duration_seconds_sum\notlp_exporter_exported_total\notlp_exporter_seen_total\nprocessedLogs_total\nprocessedSpans_total\nqueueSize_ratio\nrpc_client_duration_milliseconds_bucket\nrpc_client_duration_milliseconds_count\nrpc_client_duration_milliseconds_sum\nrpc_client_request_size_bytes_bucket\nrpc_client_request_size_bytes_count\nrpc_client_request_size_bytes_sum\nrpc_server_duration_milliseconds_bucket\nrpc_server_duration_milliseconds_count\nrpc_server_duration_milliseconds_sum\nrpc_server_request_size_bytes_bucket\nrpc_server_request_size_bytes_count\nrpc_server_request_size_bytes_sum\nrpc_server_response_size_bytes_bucket\nrpc_server_response_size_bytes_count\nrpc_server_response_size_bytes_sum\ntraces_span_metrics_calls_total\ntraces_span_metrics_duration_milliseconds_bucket\ntraces_span_metrics_duration_milliseconds_count\ntraces_span_metrics_duration_milliseconds_sum",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"== jvm cpu utilization ==\"\ncurl -s --data-urlencode 'query=jvm_cpu_recent_utilization_ratio{service_name=\"ad\"}' 'http://localhost:9090/api/v1/query' | python3 -m json.tool\necho \"== gc duration rate over last 10m ==\"\ncurl -s --data-urlencode 'query=rate(jvm_gc_duration_seconds_sum{service_name=\"ad\"}[10m])' 'http://localhost:9090/api/v1/query' | python3 -m json.tool\necho \"== gc count rate ==\"\ncurl -s --data-urlencode 'query=rate(jvm_gc_duration_seconds_count{service_name=\"ad\"}[10m])' 'http://localhost:9090/api/v1/query' | python3 -m json.tool",
+        "description": "Check ad service JVM CPU utilization and GC rates"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "== jvm cpu utilization ==\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {\n                    \"__name__\": \"jvm_cpu_recent_utilization_ratio\",\n                    \"instance\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"job\": \"opentelemetry-demo/ad\",\n                    \"service_instance_id\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"service_name\": \"ad\",\n                    \"service_namespace\": \"opentelemetry-demo\"\n                },\n                \"value\": [\n                    1788598313.31,\n                    \"0.00039312591261372567\"\n                ]\n            }\n        ]\n    }\n}\n== gc duration rate over last 10m ==\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {\n                    \"instance\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"job\": \"opentelemetry-demo/ad\",\n                    \"jvm_gc_action\": \"end of major GC\",\n                    \"jvm_gc_name\": \"MarkSweepCompact\",\n                    \"service_instance_id\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"service_name\": \"ad\",\n                    \"service_namespace\": \"opentelemetry-demo\"\n                },\n                \"value\": [\n                    1788598313.404,\n                    \"0\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"instance\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"job\": \"opentelemetry-demo/ad\",\n                    \"jvm_gc_action\": \"end of minor GC\",\n                    \"jvm_gc_name\": \"Copy\",\n                    \"service_instance_id\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"service_name\": \"ad\",\n                    \"service_namespace\": \"opentelemetry-demo\"\n                },\n                \"value\": [\n                    1788598313.404,\n                    \"0\"\n                ]\n            }\n        ]\n    }\n}\n== gc count rate ==\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {\n                    \"instance\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"job\": \"opentelemetry-demo/ad\",\n                    \"jvm_gc_action\": \"end of major GC\",\n                    \"jvm_gc_name\": \"MarkSweepCompact\",\n                    \"service_instance_id\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"service_name\": \"ad\",\n                    \"service_namespace\": \"opentelemetry-demo\"\n                },\n                \"value\": [\n                    1788598313.44,\n                    \"0\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"instance\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"job\": \"opentelemetry-demo/ad\",\n                    \"jvm_gc_action\": \"end of minor GC\",\n                    \"jvm_gc_name\": \"Copy\",\n                    \"service_instance_id\": \"1ca98097-fb94-4406-a285-a13e5ba87424\",\n                    \"service_name\": \"ad\",\n                    \"service_namespace\": \"opentelemetry-demo\"\n                },\n                \"value\": [\n                    1788598313.44,\n                    \"0\"\n                ]\n            }\n        ]\n    }\n}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"== calls rate (traffic) ==\"\ncurl -s --data-urlencode 'query=sum(rate(traces_span_metrics_calls_total{service_name=\"ad\"}[10m]))' 'http://localhost:9090/api/v1/query' | python3 -m json.tool\necho \"== p99 latency ==\"\ncurl -s --data-urlencode 'query=histogram_quantile(0.99, sum(rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"ad\"}[10m])) by (le))' 'http://localhost:9090/api/v1/query' | python3 -m json.tool",
+        "description": "Check ad service traffic rate and p99 latency"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "== calls rate (traffic) ==\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {},\n                \"value\": [\n                    1788598314.72,\n                    \"0.08336482671231354\"\n                ]\n            }\n        ]\n    }\n}\n== p99 latency ==\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {},\n                \"value\": [\n                    1788598314.773,\n                    \"47.75\"\n                ]\n            }\n        ]\n    }\n}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "now=$(date +%s)\nstart=$((now-3600))\necho \"range from $start to $now\"\ncurl -s --data-urlencode 'query=jvm_cpu_recent_utilization_ratio{service_name=\"ad\"}' --data-urlencode \"start=$start\" --data-urlencode \"end=$now\" --data-urlencode 'step=60' 'http://localhost:9090/api/v1/query_range' | python3 -c \"\nimport sys,json\nd=json.load(sys.stdin)\nfor r in d['data']['result']:\n    vals=r['values']\n    print('n=',len(vals))\n    print('min', min(float(v[1]) for v in vals), 'max', max(float(v[1]) for v in vals))\n\"\necho \"== gc rate range ==\"\ncurl -s --data-urlencode 'query=sum(rate(jvm_gc_duration_seconds_count{service_name=\"ad\"}[5m]))' --data-urlencode \"start=$start\" --data-urlencode \"end=$now\" --data-urlencode 'step=60' 'http://localhost:9090/api/v1/query_range' | python3 -c \"\nimport sys,json\nd=json.load(sys.stdin)\nfor r in d['data']['result']:\n    vals=r['values']\n    print('min', min(float(v[1]) for v in vals), 'max', max(float(v[1]) for v in vals))\n\"",
+        "description": "Check ad service CPU and GC rate over last hour range"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "range from 1788594730 to 1788598330\nn= 61\nmin 0.0003652506181164307 max 0.0009639920612418484\n== gc rate range ==\nmin 0.0 max 0.0041701765652757735",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "mcp__aiops_rag__search_past_incidents",
+      "tool_input": {
+        "query": "ad service 高 CPU 频繁 GC 停顿 复合资源型故障 adHighCpu adManualGc",
+        "top_k": 5
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "没有检索到相似的历史工单（可能是首次遇到此类问题，或历史库为空）。",
+      "signal_types_covered": [
+        "rag_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd workspace/ad 2>/dev/null && rg -n \"adHighCpu|adManualGc\" --type-add 'java:*.java' -tjava . 2>/dev/null | head -50\necho \"---if not found, broaden---\"\nrg -n \"adHighCpu|adManualGc\" . 2>/dev/null | head -80",
+        "description": "Search ad service source for flag usage"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "---if not found, broaden---\n./scripts/inject.sh:47:  s2) flip_flag \"adHighCpu\" ;;",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "ls workspace/ 2>/dev/null; echo \"---\"; find . -maxdepth 2 -iname \"*ad*\" -type d 2>/dev/null | grep -v node_modules; echo \"---inject.sh---\"; cat ./scripts/inject.sh 2>/dev/null | head -80",
+        "description": "Locate ad workspace and inspect inject script"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "recommendation\n---\n---inject.sh---\n#!/usr/bin/env bash\n# Inject a failure scenario.\n#   s1 -> flagd productCatalogFailure\n#   s2 -> flagd adServiceHighCpu\n#   s3 -> flagd kafkaQueueProblems\n#   s4 -> deploy the planted memory-leak recommendation image (seeded by seed-github.sh)\n#\n# For s1-s3 we flip the flag in the OTel demo's flagd config. For s4 we deploy the\n# planted-leak recommendation image — via kubectl on a kind cluster when\n# AIOPS_BACKEND=k8s (production form), or via `docker run` otherwise (local default).\nset -euo pipefail\n\nROOT=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")/..\" && pwd)\"\nSCENARIO=\"${1:-}\"\nFLAGD_CONFIG=\"${FLAGD_CONFIG:-$ROOT/vendor/otel-demo/src/flagd/demo.flagd.json}\"\nBACKEND=\"${AIOPS_BACKEND:-docker}\"\nK8S_NS=\"${AIOPS_K8S_NAMESPACE:-otel-demo}\"\nKIND_CLUSTER=\"${KIND_CLUSTER:-aiops}\"\n\nflip_flag() {\n  local flag=\"$1\"\n  if [ ! -f \"$FLAGD_CONFIG\" ]; then\n    echo \"[inject] flagd config not found at $FLAGD_CONFIG\"\n    echo \"[inject] run ./scripts/fetch-otel-demo.sh first, or set FLAGD_CONFIG.\"\n    echo \"[inject] MANUAL: set flag '$flag' defaultVariant to 'on' and restart flagd.\"\n    return 0\n  fi\n  # flagd hot-reloads its config file; set defaultVariant to \"on\".\n  python3 - \"$FLAGD_CONFIG\" \"$flag\" <<'PY'\nimport json, sys\npath, flag = sys.argv[1], sys.argv[2]\nwith open(path) as f:\n    cfg = json.load(f)\nflags = cfg.get(\"flags\", {})\nif flag in flags:\n    flags[flag][\"defaultVariant\"] = \"on\"\n    with open(path, \"w\") as f:\n        json.dump(cfg, f, indent=2)\n    print(f\"[inject] set {flag}.defaultVariant=on in {path}\")\nelse:\n    print(f\"[inject] flag {flag} not present in config; available: {list(flags)[:10]}\")\nPY\n}\n\ncase \"$SCENARIO\" in\n  s1) flip_flag \"productCatalogFailure\" ;;\n  s2) flip_flag \"adHighCpu\" ;;\n  s3) flip_flag \"kafkaQueueProblems\" ;;\n  s4)\n    echo \"[inject] s4: building + deploying the planted-leak recommendation image (backend=$BACKEND).\"\n    BAD_SHA=$(grep 'suspect' \"$ROOT/deploys.log\" 2>/dev/null | sed -n 's/.*sha=\\([^ ]*\\).*/\\1/p' | head -1 || true)\n    if [ -z \"${BAD_SHA:-}\" ]; then\n      echo \"[inject] run ./scripts/seed-github.sh first (it writes deploys.log + the leak commit).\"\n      exit 1\n    fi\n    FIXTURE=\"$ROOT/scripts/fixtures/recommendation\"\n    IMAGE=\"recommendation:$BAD_SHA\"\n\n    echo \"[inject] building $IMAGE from leak commit ($BAD_SHA) — pure-stdlib image, fast build…\"\n    docker build -q -t \"$IMAGE\" -t recommendation:latest \"$FIXTURE\" >/dev/null\n\n    if [ \"$BACKEND\" = \"k8s\" ]; then\n      # --- k8s path (production form): kind load image -> apply Deployment with a tight memory limit ---\n      command -v kubectl >/dev/null || { echo \"[inject] kubectl 未安装；先跑 scripts/k8s/start-kind.sh\"; exit 1; }\n      echo \"[inject] loading $IMAGE into kind cluster '$KIND_CLUSTER'…\"\n      kind load docker-image \"$IMAGE\" --name \"$KIND_CLUSTER\" >/dev/null 2>&1 \\\n        || echo \"[inject] （kind load 失败：确认集群已起 ./scripts/k8s/start-kind.sh）\"\n      kubectl create namespace \"$K8S_NS\" --dry-run=client -o yaml | kubectl apply -f - >/dev/null\n      echo \"[inject] applying Deployment (memory limit 128Mi so the leak OOM-kills the Pod)…\"\n      sed \"s|__IMAGE__|$IMAGE|g\" \"$ROOT/scripts/k8s/recommendation-leak.yaml\" | kubectl apply -f -\n      # 强制拉起新 Pod 用上新镜像（同名镜像不会自动重建）\n      kubectl -n \"$K8S_NS\" rollout restart deploy/recommendation >/dev/null 2>&1 || true\n      echo \"[inject] recommendation deployed to ns=$K8S_NS image=$IMAGE\"\n      echo \"[inject] observe the climb:   kubectl top pod -n $K8S_NS -l app=recommendation\"\n      echo \"[inject]                       kubectl describe pod -n $K8S_NS -l app=recommendation | grep -A3 'Last State'\"\n      echo \"[inject] it will OOMKill + restart within ~1-2 min; RESTARTS climbs in: kubectl get pod -n $K8S_NS -l app=recommendation\"\n    else\n      # --- docker path (local default): docker run with --memory cap ---\n      CNAME=\"${RECO_CONTAINER:-recommendation}\"\n      MEM_LIMIT=\"${RECO_MEM_LIMIT:-128m}\"",
+      "signal_types_covered": [
+        "logs",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "grep -rn \"adHighCpu\\|adManualGc\" aiops-agentic-rl/AIops-agent --include=\"*.java\" 2>/dev/null\necho \"---broad search---\"\ngrep -rln \"adHighCpu\\|adManualGc\" aiops-agentic-rl/AIops-agent 2>/dev/null | grep -v node_modules",
+        "description": "Find all references to the ad fault flags in the repo"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "---broad search---\naiops-agentic-rl/AIops-agent/scripts/inject.sh",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "FLAGD_CONFIG=$(find aiops-agentic-rl/AIops-agent -iname \"demo.flagd.json\" 2>/dev/null | head -1)\necho \"config: $FLAGD_CONFIG\"\npython3 -c \"\nimport json\nwith open('$FLAGD_CONFIG') as f:\n    cfg = json.load(f)\nflags = cfg.get('flags', {})\nfor name in ['adHighCpu','adManualGc']:\n    print(name, '=>', json.dumps(flags.get(name), indent=2))\n\"",
+        "description": "Inspect flagd config definitions for adHighCpu and adManualGc"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Exit code 1\nconfig: \nTraceback (most recent call last):\n  File \"<string>\", line 3, in <module>\nFileNotFoundError: [Errno 2] No such file or directory: ''",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "now=$(date +%s)\nstart=$((now-21600))\necho \"== cpu util last 6h (min/max/avg) ==\"\ncurl -s --data-urlencode 'query=jvm_cpu_recent_utilization_ratio{service_name=\"ad\"}' --data-urlencode \"start=$start\" --data-urlencode \"end=$now\" --data-urlencode 'step=120' 'http://localhost:9090/api/v1/query_range' | python3 -c \"\nimport sys,json\nd=json.load(sys.stdin)\nfor r in d['data']['result']:\n    vals=[float(v[1]) for v in r['values']]\n    print('n=',len(vals),'min',min(vals),'max',max(vals),'avg',sum(vals)/len(vals))\n\"\necho \"== gc count total delta last 6h ==\"\ncurl -s --data-urlencode 'query=jvm_gc_duration_seconds_count{service_name=\"ad\"}' --data-urlencode \"start=$start\" --data-urlencode \"end=$now\" --data-urlencode 'step=120' 'http://localhost:9090/api/v1/query_range' | python3 -c \"\nimport sys,json\nd=json.load(sys.stdin)\nfor r in d['data']['result']:\n    vals=[float(v[1]) for v in r['values']]\n    print(r['metric'].get('jvm_gc_action'), 'first',vals[0],'last',vals[-1])\n\"\necho \"== docker inspect restart/oom ==\"\ndocker inspect --format '{{.RestartCount}} OOMKilled={{.State.OOMKilled}} StartedAt={{.State.StartedAt}}' ad",
+        "description": "Check 6h CPU/GC trend and container restart/OOM state for ad"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "== cpu util last 6h (min/max/avg) ==\nn= 88 min 0.00039346842415896127 max 0.0015426367661762605 avg 0.0006881653199641814\n== gc count total delta last 6h ==\nend of major GC first 1.0 last 1.0\nend of minor GC first 409.0 last 411.0\n== docker inspect restart/oom ==\n0 OOMKilled=false StartedAt=2026-08-18T08:12:30.463431692Z",
+      "signal_types_covered": [
+        "prometheus",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "ad 服务的 flagd 功能开关 adHighCpu、adManualGc 当前均为 on（OFREP 实时值，reason=STATIC），与告警描述的\"两个故障开关同时命中\"完全吻合，属于故障注入类的配置误留，而非代码发版或真实流量驱动的资源瓶颈。但检查时刻的实时遥测（jvm_cpu_recent_utilization_ratio 近6h在0.04%~0.15%区间、jvm_gc_duration_seconds_count 6h内minor GC仅+2次、major GC计数0增长、p99延迟47.75ms、docker stats CPU 1.10%、RestartCount=0、OOMKilled=false）并未显示当前有实际的高CPU/频繁GC压力，且当前流量极低（calls rate≈0.083/s）。容器StartedAt=2026-08-18，晚于告警startsAt(2026-07-11)，说明该告警很可能是历史/陈旧告警或针对开关早前状态的告警，当前实例下故障效应尚未（或不再）显著显现，可能与开关效果依赖请求量有关。根因判定为 flagd 配置(故障注入开关未复位)，非代码问题；修复应在 flagd 侧将 adHighCpu、adManualGc 两个开关切回 off/默认 variant，该操作不在当前 docker 白名单(restart_instance/migrate_instance/scale_resources)覆盖范围内，故未自动执行任何处置;鉴于当前实时资源指标均正常，也没有对 ad 容器执行重启/扩容等止血动作(无证据支撑该动作必要且它也无法关闭该开关)。",
+        "kind": "config",
+        "suspect_service": "ad",
+        "suspect_repo": null,
+        "suspect_commit_hint": null,
+        "suspect_file_hint": null,
+        "remediation_type": "online_op",
+        "remediation_detail": "未自动执行任何处置。根因是 flagd 功能开关 adHighCpu、adManualGc 被置为 on（故障注入/演练开关未复位），需要人工在 flagd 侧将这两个开关的 defaultVariant 改回 off（或对应的关闭 variant）并让 flagd 热加载生效，这是解除该复合资源压力的直接手段。该操作是修改 flagd 配置，不属于当前授权的低风险白名单命令形态（仅覆盖 docker restart / compose recreate / docker update 三种针对容器实例的操作），因此系统 hook 不会放行、也不应尝试。同时，检查时刻的实时指标（jvm_cpu_recent_utilization_ratio 近6小时维持在0.04%~0.15%、GC minor计数6小时仅新增2次、major GC无增长、p99延迟47.75ms、docker stats CPU 1.10%、RestartCount=0、OOMKilled=false）显示 ad 容器当前并无真实的高CPU或GC压力，因此也没有对 ad 容器执行 restart/scale 等白名单内的止血动作——现状不支持、也不需要这类操作。建议：(1) 人工确认此故障注入实验是否应该关闭，若是则复位 adHighCpu/adManualGc 两个开关；(2) 若流量后续上升导致实际压力显现，可再评估是否需要 scale_resources 对 ad 临时抬高 CPU/内存上限作为流量增大时的缓冲。",
+        "confidence": 0.78,
+        "evidence": [
+          "OFREP: POST http://localhost:8016/ofrep/v1/evaluate/flags/adHighCpu -> {\"value\":true,\"variant\":\"on\",\"reason\":\"STATIC\"}，与告警描述的 adHighCpu 完全吻合",
+          "OFREP: POST http://localhost:8016/ofrep/v1/evaluate/flags/adManualGc -> {\"value\":true,\"variant\":\"on\",\"reason\":\"STATIC\"}，与告警描述的 adManualGc 完全吻合",
+          "PromQL: jvm_cpu_recent_utilization_ratio{service_name=\"ad\"} 近6h(step120s,n=88) min=0.00039 max=0.00154 avg=0.00069，未见CPU长期贴近上限",
+          "PromQL: jvm_gc_duration_seconds_count{service_name=\"ad\"} 近6h minor GC从409增至411(仅+2)，major GC恒为1(无新增)，未见频繁GC",
+          "PromQL: sum(rate(traces_span_metrics_calls_total{service_name=\"ad\"}[10m]))=0.083 req/s，当前流量极低",
+          "PromQL: histogram_quantile(0.99, ...duration_milliseconds_bucket{service_name=\"ad\"}...)=47.75ms，p99延迟正常，未见毛刺",
+          "docker stats --no-stream ad: CPU 1.10%, MEM 244.2MiB/300MiB(81.39%)",
+          "docker inspect ad: RestartCount=0, OOMKilled=false, StartedAt=2026-08-18T08:12:30Z（晚于告警startsAt 2026-07-11，提示告警可能针对更早状态或该实例重启后压力未再现）",
+          "repo grep: scripts/inject.sh 中 s2 场景通过 flip_flag 修改 vendor/otel-demo/src/flagd/demo.flagd.json 将 adHighCpu.defaultVariant 置为 on 来注入本故障，佐证该告警是flagd故障注入类而非代码缺陷或真实流量驱动",
+          "search_past_incidents(\"ad service 高 CPU 频繁 GC 停顿 复合资源型故障 adHighCpu adManualGc\") 未检索到历史相似工单，无可复用处置经验"
+        ],
+        "also_code_fix": false
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "kubectl_status",
+        "rag_history"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "RecommendationDuplicateResultsLive",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation /recommend 接口返回列表里出现重复商品 ID",
+    "description": "巡检脚本连续 10+ 次调用 recommendation 服务的 GET /recommend（调试端口已发布到本机 18081），每次返回的推荐列表都固定是 [\"PRODUCT-2\",\"PRODUCT-3\",\"PRODUCT-0\",\"PRODUCT-3\",\"PRODUCT-7\"]——同一个商品 PRODUCT-3 在 5 条结果里出现了两次。docker stats 显示该容器 CPU/内存/重启次数完全正常，Prometheus 上 recommendation的错误率、延迟 p99 都在历史基线范围内，flagd 相关开关（recommendationCacheFailure）当前未生效。据反馈这是团队正在灰度的一个\"目录候选+运营curated热门候选\"合并去重的新功能（feature/dedupe 分支，还没合并进 master），怀疑合并两路候选后的去重步骤没生效。没有任何基础设施信号异常，怀疑是纯业务逻辑 bug（去重函数没起作用），无法通过重启/扩容/回滚基础设施解决。"
+  },
+  "startsAt": "2026-09-01T10:00:00Z",
+  "scenario_hint": "[参数化扩增/pure_code_fix_dedupe] fixture_port=18081：真实 fixture，recommendation 容器换成 recommendation-dedupe-fixture:test 镜像（源自AIops-agent/scripts/fixtures/recommendation-dedupe/，对应 AIops-agent 自带的s11_dedupe 场景），dedupe.py::dedupe_ids() 用 .lower() 算查找 key 但存的是原始大小写 key，membership 检查永远命不中，纯代码问题，不需要也不能通过任何线上操作修复"
+}

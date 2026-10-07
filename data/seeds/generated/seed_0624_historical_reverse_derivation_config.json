@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "product-catalog",
+  "labels": {
+    "service": "product-catalog",
+    "severity": "warning",
+    "job": "product-catalog"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0008-product-catalog-config",
+    "description": "product-catalog 的搜索相关性排序开关被误配置成了一个实验性档位（本意只在小流量测试环境启用），影响了部分商品的搜索排序结果，没有对应的代码发版，人工把开关改回原值后恢复。"
+  },
+  "startsAt": "2026-07-21T13:15:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0008-product-catalog-config：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

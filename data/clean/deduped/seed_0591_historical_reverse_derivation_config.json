@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "currency",
+  "labels": {
+    "service": "currency",
+    "severity": "warning",
+    "job": "currencyservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0016-currency-config",
+    "description": "currency 依赖的外部汇率服务商证书轮换后，currency 侧配置的信任链没有同步更新，导致汇率拉取间歇性握手失败，人工介入更新配置后恢复。"
+  },
+  "startsAt": "2026-07-20T12:30:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0016-currency-config：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

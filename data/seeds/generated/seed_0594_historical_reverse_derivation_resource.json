@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "frontend",
+  "labels": {
+    "service": "frontend",
+    "severity": "critical",
+    "job": "frontend"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0037-frontend-resource",
+    "description": "frontend 首页请求量在短时间内暴增（活动预热带来的流量洪峰），实例 CPU 与连接数迅速逼近上限，属于流量驱动的资源型过载，没有伴随代码发版。"
+  },
+  "startsAt": "2026-07-20T14:45:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0037-frontend-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

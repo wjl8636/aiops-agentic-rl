@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "product-catalog",
+  "labels": {
+    "service": "product-catalog",
+    "severity": "critical",
+    "job": "product-catalog"
+  },
+  "annotations": {
+    "summary": "历史工单反演：hist-2026-03-import-timeout",
+    "description": "2026-03 的一次真实事故：product-catalog 团队上线了一个后台批量数据导入脚本，该脚本发起的下游查询忘记加超时，导致 product-catalog 的处理线程池被慢查询占满，GetProduct 接口对上游（frontend、recommendation）出现级联超时。"
+  },
+  "startsAt": "2026-07-23T06:30:00Z",
+  "scenario_hint": "[历史工单反演/static] source_ticket=hist-2026-03-import-timeout：从手写历史工单摘要样例反向抽取的告警（Milvus 检索池不足时的静态兜底）"
+}

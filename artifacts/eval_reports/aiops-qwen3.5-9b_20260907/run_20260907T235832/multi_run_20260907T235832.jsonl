@@ -1,0 +1,1 @@
+{"scenario": "s7_hybrid", "route": "feishu_low_confidence", "service_ok": false, "kind_ok": false, "route_ok": false, "triggered_code_fix": false, "fix_verified": null, "changed_files_hit": false, "diag_latency_s": 1411.087, "fix_latency_s": null, "total_latency_s": 1411.087, "pr_created": null, "run_index": 0, "ts": "2026-09-08T00:22:18+00:00"}

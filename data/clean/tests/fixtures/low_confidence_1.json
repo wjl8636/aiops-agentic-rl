@@ -1,0 +1,13 @@
+{
+  "alertname": "VagueServiceDegradation",
+  "service": "unknown",
+  "labels": {
+    "severity": "info"
+  },
+  "annotations": {
+    "summary": "有人反馈服务间歇性变慢，但没有明确信号",
+    "description": "有用户反馈大约上午 10 点左右网站『感觉有点慢』，没有指名具体服务，没有错误率飙升，也没有明显的指标异常，证据不足，无法定位根因。"
+  },
+  "startsAt": "2026-06-20T10:00:00Z",
+  "scenario_hint": "鲁棒性测试：证据不足 → 预期 confidence 低于阈值"
+}

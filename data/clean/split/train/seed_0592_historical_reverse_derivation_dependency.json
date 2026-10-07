@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "payment",
+  "labels": {
+    "service": "payment",
+    "severity": "warning",
+    "job": "paymentservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0010-payment-dependency",
+    "description": "payment 在扣款前调用内部反欺诈风控服务做校验，最近一次变更让这个调用在超时后会不断重试且没有配退避策略，风控服务短暂抖动期间 payment 的连接池被大量悬而未决的重试请求耗尽，扣款请求整体排队。"
+  },
+  "startsAt": "2026-07-20T13:15:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0010-payment-dependency：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "frontend",
+  "labels": {
+    "service": "frontend",
+    "severity": "critical",
+    "job": "frontend"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0038-frontend-deploy_regression",
+    "description": "frontend 服务内存占用最近持续走高，容器频繁重启。时间线上正好卡在最近一次发版之后，怀疑是最近一次发版引入的某个 commit 里，用一个全局 dict 按请求 key 缓存/累加计算结果，却没有配 TTL 或淘汰策略，随着不同 key 不断出现，dict 体积单调增长（这次是给会话状态加的缓存字典）。"
+  },
+  "startsAt": "2026-07-20T17:45:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0038-frontend-deploy_regression：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "CatalogPaginationFirstPageWrong",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "目录分页第一页漏掉最前面的商品，翻页边界整体错位",
+    "description": "巡检脚本比对 /catalog 分页接口与全量目录，发现第一页（page=1, page_size=2）返回的不是目录最前面的商品，而是从第 3 个开始；按页遍历整体错位，最前面的商品永远翻不到。分页浏览功能是最近合并进 master 上线的（deploys.log 里有 catalog pagination rollout 的发版记录），QA 已在预发环境用固定目录复现 20/20 次，稳定确定。CPU/内存/延迟均正常，无任何基础设施异常，怀疑是这次发版引入的纯代码问题，无法通过重启/扩容解决。"
+  },
+  "startsAt": "2026-09-06T09:00:00Z",
+  "scenario_hint": "[v9增强/D1_新bug实例] suspect_file=pagination.py：bug 在 GitHub 上游仓 master 的pagination.py（与 flagd 无关，不注入开关）——Agent 读 workspace/recommendation 克隆（master）定位 bug，验证「code_fix + suspect_file_hint 命中新文件 + 不做任何线上操作」，证据拓扑与测评一致（读仓找 bug，不是本地 fixture）"
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "RecommendationTopKAlwaysLowestScored",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "客服反馈 recommendation 首页推荐区总是展示最冷门的商品",
+    "description": "客服团队反馈用户投诉首页推荐区总是展示冷门商品；工程师对 recommendation 服务的调试端口（本机 18080）连续发起 20 次 GET /recommend，返回结果稳定是[\"PRODUCT-19\",\"PRODUCT-18\",\"PRODUCT-17\",\"PRODUCT-16\",\"PRODUCT-15\"]，跟按热度应返回的 PRODUCT-2~PRODUCT-6 恰好相反。docker stats、日志显示容器本身健康，Prometheus 错误率、延迟都正常，deploys.log 显示最近一次发版是当天早些时候的一次常规特性合并。没有基础设施异常，怀疑是这次发版把排序比较函数的方向写反了，纯代码逻辑问题，无法通过重启/扩容/回滚基础设施解决。"
+  },
+  "startsAt": "2026-09-01T10:30:00Z",
+  "scenario_hint": "[参数化扩增/pure_code_fix_ranking] fixture_port=18080：真实 fixture，recommendation 容器换成 recommendation-ranking-fixture:test 镜像（源自AIops-agent/scripts/fixtures/recommendation-ranking/，对应 AIops-agent 自带的s10_ranking 场景），ranking.py::rank_by_score() 的 sorted() 排序方向写反，纯代码问题，不需要也不能通过任何线上操作修复（跟 generate_pure_code_fix_and_info_only() 里第一条 ranking 种子复用同一个真实 fixture，只是换了一套告警叙事，验证「同一机制、不同措辞」下诊断 Agent 仍能稳定给出 code_fix）"
+}

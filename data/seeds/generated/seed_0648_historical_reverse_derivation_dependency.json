@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "product-catalog",
+  "labels": {
+    "service": "product-catalog",
+    "severity": "warning",
+    "job": "product-catalog"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0064-product-catalog-dependency",
+    "description": "告警描述与 scenario_hint 指向 flagd 功能开关 productCatalogFailure 被打开，导致 product-catalog 的 GetProduct 接口对上游 frontend/recommendation 的调用大量返回 5xx，属于依赖故障（下游被开关人为致障）。但本次只读排查未能用当前环境的实时数据独立佐证：(1) `docker ps` 显示当前环境根本未部署/运行 product-catalog、frontend 容器（仅 recommendation、ad 等 otel-demo 服务在跑）；(2) Prometheus `/api/v1/targets` 与 `/api/v1/query?query=up` 返回均为空，没有任何采集目标，无法拉取 5xx rate 佐证错误率飙升；(3) Jaeger query-service（宿主机映射端口 32769）的 `/api/services`、`/api/traces` 均只返回 Jaeger UI 静态 HTML 页而非 JSON API，无法取到失败 trace 定位故障跳数；(4) 反查 flagd 实际挂载并加载的配置文件（`vendor/otel-demo/src/flagd/demo.flagd.json`，经 `docker inspect flagd` 确认该文件即挂载到容器 `/etc/flagd` 且以 `file:./etc/flagd/demo.flagd.json` 启动）显示 productCatalogFailure 当前 `defaultVariant` 为 \"off\"，与告警所述\"开关刚被打开\"的实时状态相矛盾，说明当前沙箱环境并未真实复现该故障，只是复现告警文本场景。历史工单库中检索到 3 条几乎相同场景的既往诊断（相似度 0.58~0.67），均因同样的环境限制（未部署容器/无采集数据/Jaeger 不可用/flag 实际为 off）判定为证据不足、低置信度、走人工通道，与本次结论一致。综合结论：根因判断仍以告警自身描述为主要依据,未获得独立实时证据交叉验证，因此未执行任何自动止血命令，且即便根因属实，回退 flagd 开关也不属于当前 restart_instance/migrate_instance/scale_resources 三类白名单命令形态，product-catalog 也不在低风险自动处置授权目标清单内，故按规则升级人工处置。"
+  },
+  "startsAt": "2026-07-22T07:15:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0064-product-catalog-dependency：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

@@ -1,0 +1,9 @@
+{
+  "remediation_type": "code_fix",
+  "suspect_service": "recommendation",
+  "expect_route": "code_fix_pr",
+  "expect_kind_any_of": [
+    "dependency",
+    "deploy_regression"
+  ]
+}

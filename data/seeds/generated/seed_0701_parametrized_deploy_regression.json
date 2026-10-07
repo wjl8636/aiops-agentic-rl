@@ -1,0 +1,15 @@
+{
+  "alertname": "RecommendationRankingOrderRegression",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 推荐结果排序疑似反向，热度最低的商品排在最前面",
+    "description": "巡检脚本每 30 秒对 recommendation 服务发起一次 GET /recommend（该服务的调试端口已在 compose 里发布到本机 18080），连续 20+ 次采样返回的推荐列表固定是[\"PRODUCT-19\",\"PRODUCT-18\",\"PRODUCT-17\",\"PRODUCT-16\",\"PRODUCT-15\"]——按热度应优先返回 PRODUCT-2~PRODUCT-6 这类高分商品，当前结果恰好是热度最低的几个排在最前面，怀疑排序方向写反。docker stats 采样显示该容器 CPU/内存/重启次数均正常，Prometheus 上 recommendation 的请求错误率、延迟 p99 都在历史基线范围内，flagd 里跟 recommendation 相关的开关（recommendationCacheFailure）当前未生效，deploys.log 显示最近一次发版是 40 分钟前的一次常规特性合并，时间线吻合。没有任何基础设施信号异常，怀疑是这次发版带来的纯业务逻辑回归（排序比较函数方向写反），无法通过重启/扩容/回滚基础设施解决。"
+  },
+  "startsAt": "2026-07-05T09:00:00Z",
+  "scenario_hint": "[参数化扩增/pure_code_fix_ranking] fixture_port=18080：真实 fixture，recommendation 容器换成 recommendation-ranking-fixture:test 镜像（源自 AIops-agent/scripts/fixtures/recommendation-ranking/，对应 AIops-agent自带的 s10_ranking 场景），ranking.py::rank_by_score() 的 sorted() 排序方向写反，纯代码问题，不需要也不能通过任何线上操作修复"
+}

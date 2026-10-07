@@ -1,0 +1,102 @@
+{
+  "alert": {
+    "alertname": "FrontendImageLoadSlowPersisted",
+    "service": "frontend",
+    "labels": {
+      "service": "frontend",
+      "severity": "warning",
+      "job": "frontend"
+    },
+    "annotations": {
+      "summary": "监控发现 frontend 首页图片加载耗时自昨晚起显著抬升",
+      "description": "客服反馈今天上午起陆续有用户投诉首页商品图片加载卡顿。排查 deploys.log 发现近 48 小时内 frontend 没有任何新发版记录，docker stats 显示 frontend 容器CPU/内存/重启次数都在正常范围，Jaeger 上 frontend 到下游各服务的调用链延迟也都正常，唯一异常集中在图片资源本身的加载耗时。回查 flagd 变更记录，发现昨晚有工程师为验证图片加载慢场景下的前端兜底逻辑，手动把 imageSlowLoad 这个功能开关从默认 off 改成了测试档位，验证完之后忘记改回默认值——不是代码或基础设施问题，纯粹是这个开关当前的取值本身在起作用。"
+    },
+    "startsAt": "2026-09-06T09:00:00Z",
+    "scenario_hint": "[历史工单反演/static] source_ticket=hist-2026-09-frontend-imageslowload-debug-leftover flag=imageSlowLoad：2026-09 补充批次，手写历史工单摘要反向抽取的告警，显式标注 flag= 保证 fault_injection.py 按 flag=/flags= 精确路由（优先级高于 _inject_historical_fault() 的关键词兜底），不依赖脆弱的中文关键词猜测"
+  },
+  "alert_id": "seed_0708_historical_reverse_derivation_config",
+  "final_diagnosis": {
+    "summary": "frontend 首页图片加载变慢的根因是 flagd 功能开关 imageSlowLoad 被工程师手动改为测试档位（模拟图片慢加载的兜底逻辑验证），验证后未还原为默认值，导致该开关持续对生产流量生效，产生持续 10 秒的图片加载延迟。非代码缺陷，也非基础设施/依赖问题。",
+    "kind": "config",
+    "suspect_service": "frontend",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "online_op",
+    "remediation_detail": "需要的止血动作是将 flagd 中 imageSlowLoad 开关从当前 \"10sec\"(value=10000, reason=STATIC) 手动改回默认值 off/0。该操作属于 flagd 功能开关配置变更，不属于当前授权的 docker 处置白名单（仅覆盖 restart_instance/migrate_instance/scale_resources 三类容器级操作），因此本次未自动执行任何处置，需人工在 flagd 管理界面/配置中将 imageSlowLoad 还原为默认档位。无需改动代码或重启/扩容 frontend 容器。",
+    "confidence": 0.95,
+    "evidence": [
+      "OFREP 实时查询 http://localhost:8016/ofrep/v1/evaluate/flags/imageSlowLoad 返回 {\"value\":10000,\"key\":\"imageSlowLoad\",\"reason\":\"STATIC\",\"variant\":\"10sec\"}，证明该开关当前被静态锁定在10秒延迟档位而非默认关闭值，且 reason=STATIC 表明是被人为固定覆盖而非按用户分桶动态生效",
+      "告警 annotations.description 中记录的只读排查已排除其他根因：近48小时 deploys.log 无 frontend 新发版、docker stats 显示 CPU/内存/重启次数正常、Jaeger frontend→下游各服务调用链延迟均正常",
+      "异常现象仅集中在图片资源加载耗时本身，与 imageSlowLoad 开关的业务语义（模拟图片慢加载触发前端兜底逻辑）及其当前 10 秒延迟档位完全吻合，时间线上也与'昨晚工程师手动切换、验证后忘记还原'一致"
+    ],
+    "time_window": {
+      "from": "2026-09-05T20:00:00Z",
+      "to": "2026-09-06T09:00:00Z"
+    },
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "feishu_online_op",
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"frontend 首页图片加载变慢的根因是 flagd 功能开关 imageSlowLoad 被工程师手动改为测试档位（模拟图片慢加载的兜底逻辑验证），验证后未还原为默认值，导致该开关持续对生产流量生效，产生持续 10 秒的图片加载延迟。非代码缺陷，也非基础设施/依赖问题。\",\"kind\":\"config\",\"suspect_service\":\"frontend\",\"suspect_repo\":null,\"suspect_commit_hint\":null,\"suspect_file_hint\":null,\"remediation_type\":\"online_op\",\"remediation_detail\":\"需要的止血动作是将 flagd 中 imageSlowLoad 开关从当前 \\\"10sec\\\"(value=10000, reason=STATIC) 手动改回默认值 off/0。该操作属于 flagd 功能开关配置变更，不属于当前授权的 docker 处置白名单（仅覆盖 restart_instance/migrate_instance/scale_resources 三类容器级操作），因此本次未自动执行任何处置，需人工在 flagd 管理界面/配置中将 imageSlowLoad 还原为默认档位。无需改动代码或重启/扩容 frontend 容器。\",\"confidence\":0.95,\"evidence\":[\"OFREP 实时查询 http://localhost:8016/ofrep/v1/evaluate/flags/imageSlowLoad 返回 {\\\"value\\\":10000,\\\"key\\\":\\\"imageSlowLoad\\\",\\\"reason\\\":\\\"STATIC\\\",\\\"variant\\\":\\\"10sec\\\"}，证明该开关当前被静态锁定在10秒延迟档位而非默认关闭值，且 reason=STATIC 表明是被人为固定覆盖而非按用户分桶动态生效\",\"告警 annotations.description 中记录的只读排查已排除其他根因：近48小时 deploys.log 无 frontend 新发版、docker stats 显示 CPU/内存/重启次数正常、Jaeger frontend→下游各服务调用链延迟均正常\",\"异常现象仅集中在图片资源加载耗时本身，与 imageSlowLoad 开关的业务语义（模拟图片慢加载触发前端兜底逻辑）及其当前 10 秒延迟档位完全吻合，时间线上也与'昨晚工程师手动切换、验证后忘记还原'一致\"],\"time_window\":{\"from\":\"2026-09-05T20:00:00Z\",\"to\":\"2026-09-06T09:00:00Z\"},\"also_code_fix\":false}",
+    "pruning": {
+      "steps_before": 2,
+      "steps_after": 2,
+      "removed": [],
+      "restored_by_verification": []
+    }
+  },
+  "steps": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/imageSlowLoad' -H 'Content-Type: application/json' -d '{}'"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"value\":10000,\"key\":\"imageSlowLoad\",\"reason\":\"STATIC\",\"variant\":\"10sec\",\"metadata\":{}}",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "frontend 首页图片加载变慢的根因是 flagd 功能开关 imageSlowLoad 被工程师手动改为测试档位（模拟图片慢加载的兜底逻辑验证），验证后未还原为默认值，导致该开关持续对生产流量生效，产生持续 10 秒的图片加载延迟。非代码缺陷，也非基础设施/依赖问题。",
+        "kind": "config",
+        "suspect_service": "frontend",
+        "suspect_repo": null,
+        "suspect_commit_hint": null,
+        "suspect_file_hint": null,
+        "remediation_type": "online_op",
+        "remediation_detail": "需要的止血动作是将 flagd 中 imageSlowLoad 开关从当前 \"10sec\"(value=10000, reason=STATIC) 手动改回默认值 off/0。该操作属于 flagd 功能开关配置变更，不属于当前授权的 docker 处置白名单（仅覆盖 restart_instance/migrate_instance/scale_resources 三类容器级操作），因此本次未自动执行任何处置，需人工在 flagd 管理界面/配置中将 imageSlowLoad 还原为默认档位。无需改动代码或重启/扩容 frontend 容器。",
+        "confidence": 0.95,
+        "evidence": [
+          "OFREP 实时查询 http://localhost:8016/ofrep/v1/evaluate/flags/imageSlowLoad 返回 {\"value\":10000,\"key\":\"imageSlowLoad\",\"reason\":\"STATIC\",\"variant\":\"10sec\"}，证明该开关当前被静态锁定在10秒延迟档位而非默认关闭值，且 reason=STATIC 表明是被人为固定覆盖而非按用户分桶动态生效",
+          "告警 annotations.description 中记录的只读排查已排除其他根因：近48小时 deploys.log 无 frontend 新发版、docker stats 显示 CPU/内存/重启次数正常、Jaeger frontend→下游各服务调用链延迟均正常",
+          "异常现象仅集中在图片资源加载耗时本身，与 imageSlowLoad 开关的业务语义（模拟图片慢加载触发前端兜底逻辑）及其当前 10 秒延迟档位完全吻合，时间线上也与'昨晚工程师手动切换、验证后忘记还原'一致"
+        ],
+        "time_window": {
+          "from": "2026-09-05T20:00:00Z",
+          "to": "2026-09-06T09:00:00Z"
+        },
+        "also_code_fix": false
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "jaeger",
+        "logs",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ]
+}

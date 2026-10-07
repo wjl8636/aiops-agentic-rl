@@ -1,0 +1,15 @@
+{
+  "alertname": "RecommendationRankingRegression",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 排序结果明显变差",
+    "description": "最近一次发版之后，recommendation 的排序结果出现明显回归，怀疑是 ranking.py 里的代码 bug，commit 引入了排序方向反转。"
+  },
+  "startsAt": "2026-06-20T10:10:00Z",
+  "scenario_hint": "发版引入的代码回归，期望 remediation_type=code_fix"
+}

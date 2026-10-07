@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "checkout",
+  "labels": {
+    "service": "checkout",
+    "severity": "warning",
+    "job": "checkoutservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0004-checkout-dependency",
+    "description": "checkout 在下单转换阶段同步调用 shipping 获取运费报价，这次调用没有配超时；shipping 依赖的 quote 服务当时正处于一次局部限流故障期，checkout 的调用线程被逐个卡死在等待响应上，最终把自己的线程池耗尽。"
+  },
+  "startsAt": "2026-07-21T08:45:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0004-checkout-dependency：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

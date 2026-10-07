@@ -1,0 +1,15 @@
+{
+  "alertname": "HighCpuUsage",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "ad 服务 CPU 使用率飙升（第一次触发）",
+    "description": "flagd 开关 adServiceHighCpu 打开后，ad 容器 CPU 使用率长期打满。"
+  },
+  "startsAt": "2026-06-20T10:05:00Z",
+  "scenario_hint": "第一次触发，会被记入指纹表"
+}

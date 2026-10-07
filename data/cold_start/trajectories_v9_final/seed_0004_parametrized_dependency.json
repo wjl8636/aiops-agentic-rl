@@ -1,0 +1,368 @@
+{
+  "alert": {
+    "alertname": "DependencyFailureRate",
+    "service": "recommendation",
+    "labels": {
+      "service": "recommendation",
+      "severity": "warning",
+      "job": "recommendation"
+    },
+    "annotations": {
+      "summary": "recommendation 依赖调用错误率上升",
+      "description": "一次功能开关变更（recommendationCacheFailure）之后，recommendation（recommendation 服务的缓存层失效）开始对上游调用方返回失败/超时。上游服务的请求成功率随之下降，错误集中出现在依赖 recommendation 的那部分调用路径上，没有伴随代码发版。"
+    },
+    "startsAt": "2026-07-01T11:15:00Z",
+    "scenario_hint": "[参数化扩增/dependency] flag=recommendationCacheFailure service=recommendation severity=warning：验证依赖故障场景在不同服务/severity/时间窗下的泛化"
+  },
+  "alert_id": "seed_0004_parametrized_dependency",
+  "final_diagnosis": {
+    "summary": "recommendation 服务的功能开关 recommendationCacheFailure 已通过 flagd 静态覆盖设为 true（OFREP 实测 value=true, reason=STATIC, variant=on），与告警描述的\"一次功能开关变更后缓存层失效\"完全吻合。该服务代码仓库（workspace/recommendation）当前只有一次内存泄漏修复相关的提交（16837d0/f18f452/ac26792），近期无代码发版，符合告警\"没有伴随代码发版\"的说明，排除了代码回归。frontend/recommendation 容器均未见 OOMKilled、RestartCount=0，Jaeger 中未捕获到该窗口内 recommendation 相关的下游报错 span（仅有历史 flagd EventStream 噪声及 2026-08-18 的陈旧 DNS 报错，与本次告警时间线无关），说明当前采样窗口内没有直接的失败调用链佐证，根因主要靠 flagd 开关状态坐实。真正的止血手段是把 recommendationCacheFailure 这个 flagd 功能开关改回 off/关闭，这是一次 flag 配置回退操作，不属于当前 docker 白名单（restart_instance/migrate_instance/scale_resources 均无法复位 flagd 中的静态覆盖值，重启 recommendation 容器不会改变 flagd 的开关状态），因此本次未自动执行任何处置，建议人工在 flagd 管理侧关闭该开关。",
+    "kind": "config",
+    "suspect_service": "recommendation",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "online_op",
+    "remediation_detail": "建议：由人工/flagd 管理侧将功能开关 recommendationCacheFailure 从 on 改回 off（flagd 配置回退），使 recommendation 缓存层恢复正常，上游调用成功率应随之回升。未执行任何自动处置：本次故障根因是 flagd 静态开关覆盖，而非容器资源/进程状态问题；docker 白名单里的 restart_instance/migrate_instance/scale_resources 三种操作都不能复位 flagd 中的 flag 值（重启或重建 recommendation 容器后，flagd 仍会按当前静态配置把该 flag 评估为 true，缓存失效会立即复现），不属于可低风险自动执行的处置范围，故转交人工在 flagd 侧回退该开关。",
+    "confidence": 0.62,
+    "evidence": [
+      "OFREP 实测：curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/recommendationCacheFailure' 返回 {\"value\":true,\"key\":\"recommendationCacheFailure\",\"reason\":\"STATIC\",\"variant\":\"on\"} —— 开关当前确实被静态覆盖为开启，与告警描述的触发条件一致",
+      "docker inspect recommendation: RestartCount=0, OOMKilled=false, Status=running —— 排除内存/进程崩溃类根因",
+      "workspace/recommendation 的 git log 仅有 16837d0/f18f452/ac26792 三次与内存泄漏修复相关的提交，无近期发版，与告警 annotations 中'没有伴随代码发版'的描述一致，且 grep 全仓库未找到 recommendationCacheFailure 的代码引用，说明该 flag 是纯配置层开关，非代码逻辑分支",
+      "Jaeger: curl 'http://localhost:16686/jaeger/ui/api/traces?service=recommendation&tags={\"error\":\"true\"}&lookback=3h' 20 条结果全部是 /flagd.evaluation.v2.Service/EventStream 的历史噪声（flagd UNIMPLEMENTED/404），未见业务性 GetRecommendations/ListRecommendations 报错 span；frontend 近15分钟日志无 recommendation 相关报错（此前 2026-08-18 的 DNS 解析失败日志与本次告警时间线无关），当前采样窗口内缺乏直接的失败调用链证据，因此调低 confidence",
+      "Prometheus: traces_span_metrics_calls_total{service_name=\"recommendation\"} 仅返回 flagd EventStream 的 STATUS_CODE_ERROR 系列（历史累计值），未发现 ListRecommendations 相关的错误计数指标"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "feishu_online_op",
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"recommendation 服务的功能开关 recommendationCacheFailure 已通过 flagd 静态覆盖设为 true（OFREP 实测 value=true, reason=STATIC, variant=on），与告警描述的\\\"一次功能开关变更后缓存层失效\\\"完全吻合。该服务代码仓库（workspace/recommendation）当前只有一次内存泄漏修复相关的提交（16837d0/f18f452/ac26792），近期无代码发版，符合告警\\\"没有伴随代码发版\\\"的说明，排除了代码回归。frontend/recommendation 容器均未见 OOMKilled、RestartCount=0，Jaeger 中未捕获到该窗口内 recommendation 相关的下游报错 span（仅有历史 flagd EventStream 噪声及 2026-08-18 的陈旧 DNS 报错，与本次告警时间线无关），说明当前采样窗口内没有直接的失败调用链佐证，根因主要靠 flagd 开关状态坐实。真正的止血手段是把 recommendationCacheFailure 这个 flagd 功能开关改回 off/关闭，这是一次 flag 配置回退操作，不属于当前 docker 白名单（restart_instance/migrate_instance/scale_resources 均无法复位 flagd 中的静态覆盖值，重启 recommendation 容器不会改变 flagd 的开关状态），因此本次未自动执行任何处置，建议人工在 flagd 管理侧关闭该开关。\",\"kind\":\"config\",\"suspect_service\":\"recommendation\",\"remediation_type\":\"online_op\",\"also_code_fix\":false,\"remediation_detail\":\"建议：由人工/flagd 管理侧将功能开关 recommendationCacheFailure 从 on 改回 off（flagd 配置回退），使 recommendation 缓存层恢复正常，上游调用成功率应随之回升。未执行任何自动处置：本次故障根因是 flagd 静态开关覆盖，而非容器资源/进程状态问题；docker 白名单里的 restart_instance/migrate_instance/scale_resources 三种操作都不能复位 flagd 中的 flag 值（重启或重建 recommendation 容器后，flagd 仍会按当前静态配置把该 flag 评估为 true，缓存失效会立即复现），不属于可低风险自动执行的处置范围，故转交人工在 flagd 侧回退该开关。\",\"confidence\":0.62,\"evidence\":[\"OFREP 实测：curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/recommendationCacheFailure' 返回 {\\\"value\\\":true,\\\"key\\\":\\\"recommendationCacheFailure\\\",\\\"reason\\\":\\\"STATIC\\\",\\\"variant\\\":\\\"on\\\"} —— 开关当前确实被静态覆盖为开启，与告警描述的触发条件一致\",\"docker inspect recommendation: RestartCount=0, OOMKilled=false, Status=running —— 排除内存/进程崩溃类根因\",\"workspace/recommendation 的 git log 仅有 16837d0/f18f452/ac26792 三次与内存泄漏修复相关的提交，无近期发版，与告警 annotations 中'没有伴随代码发版'的描述一致，且 grep 全仓库未找到 recommendationCacheFailure 的代码引用，说明该 flag 是纯配置层开关，非代码逻辑分支\",\"Jaeger: curl 'http://localhost:16686/jaeger/ui/api/traces?service=recommendation&tags={\\\"error\\\":\\\"true\\\"}&lookback=3h' 20 条结果全部是 /flagd.evaluation.v2.Service/EventStream 的历史噪声（flagd UNIMPLEMENTED/404），未见业务性 GetRecommendations/ListRecommendations 报错 span；frontend 近15分钟日志无 recommendation 相关报错（此前 2026-08-18 的 DNS 解析失败日志与本次告警时间线无关），当前采样窗口内缺乏直接的失败调用链证据，因此调低 confidence\",\"Prometheus: traces_span_metrics_calls_total{service_name=\\\"recommendation\\\"} 仅返回 flagd EventStream 的 STATUS_CODE_ERROR 系列（历史累计值），未发现 ListRecommendations 相关的错误计数指标\"],\"suspect_repo\":null,\"suspect_commit_hint\":null,\"suspect_file_hint\":null}",
+    "pruning": {
+      "steps_before": 22,
+      "steps_after": 19,
+      "removed": [
+        {
+          "step_index_1based": 17,
+          "tool_name": "Bash",
+          "reason": "skeleton-repeat:docker-logs:recommendation",
+          "command_snippet": "docker logs recommendation --since 30m -t 2>&1 | tail -80"
+        },
+        {
+          "step_index_1based": 19,
+          "tool_name": "Bash",
+          "reason": "skeleton-repeat:docker-logs:recommendation",
+          "command_snippet": "docker logs recommendation --since 2h -t 2>&1 | tail -60"
+        },
+        {
+          "step_index_1based": 20,
+          "tool_name": "Bash",
+          "reason": "no-signal-no-fact",
+          "command_snippet": "grep -rln \"recommendationCacheFailure\" . 2>/dev/null | grep -v node_modules"
+        }
+      ],
+      "restored_by_verification": []
+    }
+  },
+  "steps": [
+    {
+      "tool_name": "Skill",
+      "tool_input": {
+        "skill": "dependency-error"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Launching skill: dependency-error",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/recommendationCacheFailure' -H 'Content-Type: application/json' -d '{}'",
+        "description": "查询 recommendationCacheFailure 功能开关当前值"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"value\":true,\"key\":\"recommendationCacheFailure\",\"reason\":\"STATIC\",\"variant\":\"on\",\"metadata\":{}}",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s 'http://localhost:16686/jaeger/ui/api/services'",
+        "description": "列出 Jaeger 已知服务"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"data\":[\"flagd\",\"recommendation\",\"ad\",\"jaeger-all-in-one\",\"fraud-detection\",\"load-generator\"],\"total\":6,\"limit\":0,\"offset\":0,\"errors\":null}",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -sg 'http://localhost:16686/jaeger/ui/api/traces?service=recommendation&tags={\"error\":\"true\"}&lookback=3h&limit=20'",
+        "description": "查 recommendation 服务错误 trace"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "<persisted-output>\nOutput too large (68.2KB). Full output saved to: /Users/user/.cc-mirror/codewiz-cc/config/projects/-Users-user-projects-side-project-learn-agent-with-huainan-aiops-agentic-rl-AIops-agent/2c406382-241c-448e-905a-60c165b10b5e/tool-results/b2wqwzkwb.txt\n\nPreview (first 2KB):\n{\"data\":[{\"traceID\":\"a8e36723477a5d3de3857a1997fe12a1\",\"spans\":[{\"traceID\":\"a8e36723477a5d3de3857a1997fe12a1\",\"spanID\":\"786f38943f0e9a58\",\"operationName\":\"/flagd.evaluation.v2.Service/EventStream\",\"references\":[],\"startTime\":1788596104285835,\"duration\":7557,\"tags\":[{\"key\":\"error\",\"type\":\"bool\",\"value\":true},{\"key\":\"otel.scope.name\",\"type\":\"string\",\"value\":\"opentelemetry.instrumentation.grpc\"},{\"key\":\"otel.scope.version\",\"type\":\"string\",\"value\":\"0.64b0\"},{\"key\":\"otel.status_code\",\"type\":\"string\",\"value\":\"ERROR\"},{\"key\":\"otel.status_description\",\"type\":\"string\",\"value\":\"_MultiThreadedRendezvous: \\u003c_MultiThreadedRendezvous of RPC that terminated with:\\n\\tstatus = StatusCode.UNIMPLEMENTED\\n\\tdetails = \\\"Received http2 header with status: 404\\\"\\n\\tdebug_error_string = \\\"UNIMPLEMENTED:Received http2 header with status: 404\\\"\\n\\u003e\"},{\"key\":\"rpc.grpc.status_code\",\"type\":\"int64\",\"value\":12},{\"key\":\"rpc.method\",\"type\":\"string\",\"value\":\"EventStream\"},{\"key\":\"rpc.service\",\"type\":\"string\",\"value\":\"flagd.evaluation.v2.Service\"},{\"key\":\"rpc.system\",\"type\":\"string\",\"value\":\"grpc\"},{\"key\":\"span.kind\",\"type\":\"string\",\"value\":\"client\"}],\"logs\":[{\"timestamp\":1788596104293350,\"fields\":[{\"key\":\"event\",\"type\":\"string\",\"value\":\"exception\"},{\"key\":\"exception.escaped\",\"type\":\"string\",\"value\":\"False\"},{\"key\":\"exception.message\",\"type\":\"string\",\"value\":\"\\u003c_MultiThreadedRendezvous of RPC that terminated with:\\n\\tstatus = StatusCode.UNIMPLEMENTED\\n\\tdetails = \\\"Received http2 header with status: 404\\\"\\n\\tdebug_error_string = \\\"UNIMPLEMENTED:Received http2 header with status: 404\\\"\\n\\u003e\"},{\"key\":\"exception.stacktrace\",\"type\":\"string\",\"value\":\"Traceback (most recent call last):\\n  File \\\"/venv/lib/python3.14/site-packages/opentelemetry/trace/__init__.py\\\", line 608, in use_span\\n    yield span\\n  File \\\"/venv/lib/python3.14/site-packages/opentelemetry/sdk/trace/__init__.py\\\", line 1177, in start_as_current_span\\n    yield span\\n  File \\\"/venv/lib/python3.14/site-packages/opentelemetr\n...\n</persisted-output>",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "mcp__aiops_rag__search_past_incidents",
+      "tool_input": {
+        "query": "recommendation 缓存层失效 功能开关变更导致依赖调用错误率上升 recommendationCacheFailure",
+        "top_k": 5
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "没有检索到相似的历史工单（可能是首次遇到此类问题，或历史库为空）。",
+      "signal_types_covered": [
+        "rag_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "python3 -c \"\nimport json\nwith open('/Users/user/.cc-mirror/codewiz-cc/config/projects/-Users-user-projects-side-project-learn-agent-with-huainan-aiops-agentic-rl-AIops-agent/2c406382-241c-448e-905a-60c165b10b5e/tool-results/b2wqwzkwb.txt') as f:\n    content = f.read()\ndata = json.loads(content)\ntraces = data['data']\nprint('num traces:', len(traces))\nfor t in traces:\n    for s in t['spans']:\n        tags = {tg['key']: tg.get('value') for tg in s['tags']}\n        if tags.get('error') and 'flagd' not in s['operationName']:\n            print(t['traceID'], s['operationName'], tags.get('otel.status_description') or tags.get('rpc.grpc.status_code'))\n\"\n",
+        "description": "解析 trace 数据，过滤非 flagd 的错误 span"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "num traces: 20",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "python3 -c \"\nimport json\nwith open('/Users/user/.cc-mirror/codewiz-cc/config/projects/-Users-user-projects-side-project-learn-agent-with-huainan-aiops-agentic-rl-AIops-agent/2c406382-241c-448e-905a-60c165b10b5e/tool-results/b2wqwzkwb.txt') as f:\n    content = f.read()\ndata = json.loads(content)\ntraces = data['data']\nfor t in traces:\n    procs = t.get('processes', {})\n    for s in t['spans']:\n        tags = {tg['key']: tg.get('value') for tg in s['tags']}\n        pid = s.get('processID')\n        svc = procs.get(pid, {}).get('serviceName')\n        print(t['traceID'][:8], svc, s['operationName'], 'ERR' if tags.get('error') else '')\n\" | sort | uniq -c | sort -rn | head -50\n",
+        "description": "统计各 trace 中的服务与操作名分布"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "   1 fd4e92bb recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 de12651d recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 da70e526 recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 da56a424 recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 c45ef641 recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 a8e36723 recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 a0cfd12d recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 9897ba8f recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 97288bf5 recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 8f7a719f recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 83466f7e recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 82c408d0 recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 6a53e24b recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 54bd4859 recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 4dab96cf recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 438d1c45 recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 26cddd97 recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 16b4d513 recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 0b221698 recommendation /flagd.evaluation.v2.Service/EventStream ERR\n   1 043dc92c recommendation /flagd.evaluation.v2.Service/EventStream ERR",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s \"http://localhost:16686/jaeger/ui/api/dependencies?endTs=$(($(date +%s)*1000))&lookback=10800000\"",
+        "description": "查询服务依赖图"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"data\":[{\"parent\":\"fraud-detection\",\"child\":\"flagd\",\"callCount\":6}],\"total\":0,\"limit\":0,\"offset\":0,\"errors\":null}",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -sg 'http://localhost:16686/jaeger/ui/api/traces?service=ad&tags={\"error\":\"true\"}&lookback=3h&limit=10' -o /tmp/ad_err.json; python3 -c \"\nimport json\ndata=json.load(open('/tmp/ad_err.json'))\nfor t in data['data']:\n    procs=t.get('processes',{})\n    for s in t['spans']:\n        tags={tg['key']:tg.get('value') for tg in s['tags']}\n        svc=procs.get(s.get('processID'),{}).get('serviceName')\n        if tags.get('error'):\n            print(t['traceID'][:8], svc, s['operationName'], tags.get('otel.status_description'))\n\"\n",
+        "description": "查 ad 服务错误 trace，看是否指向 recommendation"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "5ac4a0a4 ad flagd.evaluation.v2.Service/EventStream None\nf9178c94 ad flagd.evaluation.v2.Service/EventStream None\n90219dd2 ad flagd.evaluation.v2.Service/EventStream None\nfbe45ced ad flagd.evaluation.v2.Service/EventStream None\n05b486ec ad flagd.evaluation.v2.Service/EventStream None\n73fc4bef ad flagd.evaluation.v2.Service/EventStream None\nfc87fe6c ad flagd.evaluation.v2.Service/EventStream None\n51d34bbd ad flagd.evaluation.v2.Service/EventStream None\nfbaf7fea ad flagd.evaluation.v2.Service/EventStream None\nd487eea4 ad flagd.evaluation.v2.Service/EventStream None",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps --format '{{.Names}}\\t{{.Status}}' | sort",
+        "description": "列出运行中的容器"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "accounting\tUp 2 weeks\nad\tUp 2 weeks\naiops-gitea\tUp 2 weeks\naiops-milvus-etcd\tUp 2 weeks (healthy)\naiops-milvus-minio\tUp 2 weeks (healthy)\ncheckout\tUp 2 weeks\ncurrency\tUp 2 weeks\nemail\tUp 2 weeks\nflagd\tUp 3 days\nfraud-detection\tUp 2 weeks\nfrontend\tUp 2 weeks\nimage-provider\tUp 2 weeks\njaeger\tUp 3 days\nkafka\tUp 4 days (healthy)\nload-generator\tUp 43 minutes\nopensearch\tUp 2 weeks (healthy)\notel-collector\tUp 2 weeks\npayment\tUp 2 weeks\nproduct-catalog\tUp 2 weeks\nprometheus\tUp 2 weeks\nquote\tUp 2 weeks\nrecommendation\tUp 2 days\nshipping\tUp 2 weeks",
+      "signal_types_covered": [
+        "prometheus",
+        "jaeger",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s --data-urlencode 'query=traces_span_metrics_calls_total{service_name=\"recommendation\"}' 'http://localhost:9090/api/v1/query' | python3 -m json.tool 2>/dev/null | head -100",
+        "description": "查询 recommendation 服务 Prometheus 指标"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {\n                    \"__name__\": \"traces_span_metrics_calls_total\",\n                    \"instance\": \"fdb7d0d0-efe4-43cf-8532-fc89d57e8bb6\",\n                    \"job\": \"opentelemetry-demo/recommendation\",\n                    \"service_instance_id\": \"fdb7d0d0-efe4-43cf-8532-fc89d57e8bb6\",\n                    \"service_name\": \"recommendation\",\n                    \"service_namespace\": \"opentelemetry-demo\",\n                    \"span_kind\": \"SPAN_KIND_CLIENT\",\n                    \"span_name\": \"/flagd.evaluation.v2.Service/EventStream\",\n                    \"status_code\": \"STATUS_CODE_ERROR\"\n                },\n                \"value\": [\n                    1788596392.556,\n                    \"24\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"__name__\": \"traces_span_metrics_calls_total\",\n                    \"instance\": \"b958cf4b-b065-4438-b4dc-8740326215e9\",\n                    \"job\": \"opentelemetry-demo/recommendation\",\n                    \"service_instance_id\": \"b958cf4b-b065-4438-b4dc-8740326215e9\",\n                    \"service_name\": \"recommendation\",\n                    \"service_namespace\": \"opentelemetry-demo\",\n                    \"span_kind\": \"SPAN_KIND_CLIENT\",\n                    \"span_name\": \"/flagd.evaluation.v2.Service/EventStream\",\n                    \"status_code\": \"STATUS_CODE_ERROR\"\n                },\n                \"value\": [\n                    1788596392.556,\n                    \"236\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"__name__\": \"traces_span_metrics_calls_total\",\n                    \"instance\": \"d6cadd2a-7d73-4575-8746-b1d66fb94c56\",\n                    \"job\": \"opentelemetry-demo/recommendation\",\n                    \"service_instance_id\": \"d6cadd2a-7d73-4575-8746-b1d66fb94c56\",\n                    \"service_name\": \"recommendation\",\n                    \"service_namespace\": \"opentelemetry-demo\",\n                    \"span_kind\": \"SPAN_KIND_CLIENT\",\n                    \"span_name\": \"/flagd.evaluation.v2.Service/EventStream\",\n                    \"status_code\": \"STATUS_CODE_ERROR\"\n                },\n                \"value\": [\n                    1788596392.556,\n                    \"84\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"__name__\": \"traces_span_metrics_calls_total\",\n                    \"instance\": \"fc79edad-fe97-48da-92ad-52e542858bf3\",\n                    \"job\": \"opentelemetry-demo/recommendation\",\n                    \"service_instance_id\": \"fc79edad-fe97-48da-92ad-52e542858bf3\",\n                    \"service_name\": \"recommendation\",\n                    \"service_namespace\": \"opentelemetry-demo\",\n                    \"span_kind\": \"SPAN_KIND_CLIENT\",\n                    \"span_name\": \"/flagd.evaluation.v2.Service/EventStream\",\n                    \"status_code\": \"STATUS_CODE_ERROR\"\n                },\n                \"value\": [\n                    1788596392.556,\n                    \"71\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"__name__\": \"traces_span_metrics_calls_total\",\n                    \"instance\": \"db68c960-9ecc-4858-a8fd-99c34a4bc967\",\n                    \"job\": \"opentelemetry-demo/recommendation\",\n                    \"service_instance_id\": \"db68c960-9ecc-4858-a8fd-99c34a4bc967\",\n                    \"service_name\": \"recommendation\",\n                    \"service_namespace\": \"opentelemetry-demo\",\n                    \"span_kind\": \"SPAN_KIND_CLIENT\",\n                    \"span_name\": \"/flagd.evaluation.v2.Service/EventStream\",\n                    \"status_code\": \"STATUS_CODE_ERROR\"\n                },\n                \"value\": [\n                    1788596392.556,\n                    \"57\"\n                ]\n            },\n            {\n                \"metric\": {\n                    \"__name__\": \"traces_span_metrics_calls_total\",\n                    \"instance\": \"4487af01-8e63-4a65-a31c-795b37e4d089\",\n                    \"job\": \"opentelemetry-demo/recommendation\",\n                    \"service_instance_id\": \"4487af01-8e63-4a65-a31c-795b37e4d089\",\n                    \"service_name\": \"recommendation\",\n                    \"service_namespace\": \"opentelemetry-demo\",\n                    \"span_kind\": \"SPAN_KIND_CLIENT\",\n                    \"span_name\": \"/flagd.evaluation.v2.Service/EventStream\",",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s --data-urlencode 'query=traces_span_metrics_calls_total{service_name=\"frontend\",status_code=\"STATUS_CODE_ERROR\"}' 'http://localhost:9090/api/v1/query' | python3 -c \"\nimport json,sys\nd=json.load(sys.stdin)\nfor r in d['data']['result']:\n    m=r['metric']\n    print(m.get('span_name'), m.get('span_kind'), r['value'])\n\"",
+        "description": "查询 frontend 服务错误 span 指标"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "tcp.connect SPAN_KIND_INTERNAL [1788596400.271, '6']\nexecuting api route (pages) /api/products/[productId] SPAN_KIND_INTERNAL [1788596400.271, '276']\ngrpc.oteldemo.CartService/AddItem SPAN_KIND_CLIENT [1788596400.271, '7573']\nexecuting api route (pages) /api/checkout SPAN_KIND_INTERNAL [1788596400.271, '404']\ndns.lookup SPAN_KIND_CLIENT [1788596400.271, '403']\nPOST SPAN_KIND_SERVER [1788596400.271, '7977']\nGET SPAN_KIND_CLIENT [1788596400.271, '2']\ngrpc.oteldemo.AdService/GetAds SPAN_KIND_CLIENT [1788596400.271, '9']\nexecuting api route (pages) /api/recommendations SPAN_KIND_INTERNAL [1788596400.271, '45647']\nGET SPAN_KIND_SERVER [1788596400.271, '97998']\nexecuting api route (pages) /api/data SPAN_KIND_INTERNAL [1788596400.271, '9']\nexecuting api route (pages) /api/cart SPAN_KIND_INTERNAL [1788596400.271, '59639']\ngrpc.oteldemo.ProductCatalogService/GetProduct SPAN_KIND_CLIENT [1788596400.271, '276']\ngrpc.oteldemo.CheckoutService/PlaceOrder SPAN_KIND_CLIENT [1788596400.271, '404']\ngrpc.oteldemo.CartService/GetCart SPAN_KIND_CLIENT [1788596400.271, '52066']\ngrpc.oteldemo.RecommendationService/ListRecommendations SPAN_KIND_CLIENT [1788596400.271, '45647']",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs recommendation --tail 100 2>&1 | tail -100",
+        "description": "查看 recommendation 容器日志"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "2026-09-02 12:16:07,903 WARNING [opentelemetry._logs._internal] [__init__.py:414] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Overriding of current LoggerProvider is not allowed\n2026-09-02 12:16:07,912 INFO [main] [recommendation_server.py:168] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Recommendation service started, listening on port 9001\n2026-09-02 12:32:38,063 WARNING [opentelemetry._logs._internal] [__init__.py:414] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Overriding of current LoggerProvider is not allowed\n2026-09-02 12:32:38,068 INFO [main] [recommendation_server.py:168] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Recommendation service started, listening on port 9001\n2026-09-02 12:52:51,758 WARNING [opentelemetry._logs._internal] [__init__.py:414] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Overriding of current LoggerProvider is not allowed\n2026-09-02 12:52:51,764 INFO [main] [recommendation_server.py:168] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Recommendation service started, listening on port 9001\n2026-09-02 12:57:37,947 WARNING [opentelemetry._logs._internal] [__init__.py:414] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Overriding of current LoggerProvider is not allowed\n2026-09-02 12:57:37,961 INFO [main] [recommendation_server.py:168] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Recommendation service started, listening on port 9001\n2026-09-02 13:12:28,781 WARNING [opentelemetry._logs._internal] [__init__.py:414] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Overriding of current LoggerProvider is not allowed\n2026-09-02 13:12:28,790 INFO [main] [recommendation_server.py:168] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Recommendation service started, listening on port 9001\n2026-09-02 13:16:38,502 WARNING [opentelemetry._logs._internal] [__init__.py:414] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Overriding of current LoggerProvider is not allowed\n2026-09-02 13:16:38,509 INFO [main] [recommendation_server.py:168] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Recommendation service started, listening on port 9001\n2026-09-02 13:27:57,406 WARNING [opentelemetry._logs._internal] [__init__.py:414] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Overriding of current LoggerProvider is not allowed\n2026-09-02 13:27:57,415 INFO [main] [recommendation_server.py:168] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Recommendation service started, listening on port 9001\n2026-09-02 13:31:59,926 WARNING [opentelemetry._logs._internal] [__init__.py:414] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Overriding of current LoggerProvider is not allowed\n2026-09-02 13:31:59,934 INFO [main] [recommendation_server.py:168] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Recommendation service started, listening on port 9001\n2026-09-02 22:10:32,914 WARNING [opentelemetry.sdk.metrics._internal.export] [__init__.py:557] [trace_id=0 span_id=0 resource.service.name=recommendation trace_sampled=False] - Metric collection timed out. Will try again after 60.0 seconds\nTraceback (most recent call last):\n  File \"/venv/lib/python3.14/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py\", line 555, in _ticker\n    self.collect(timeout_millis=self._export_timeout_millis)\n    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/venv/lib/python3.14/site-packages/opentelemetry/sdk/metrics/_internal/export/__init__.py\", line 360, in collect\n    metrics = self._collect(self, timeout_millis=timeout_millis)\n  File \"/venv/lib/python3.14/site-packages/opentelemetry/sdk/metrics/_internal/measurement_consumer.py\", line 117, in collect\n    raise MetricsTimeoutError(\n        \"Timed out while executing callback\"\n    )\nopentelemetry.sdk.metrics._internal.exceptions.MetricsTimeoutError: Timed out while executing callback",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker inspect --format 'RestartCount={{.RestartCount}} OOMKilled={{.State.OOMKilled}} Status={{.State.Status}} StartedAt={{.State.StartedAt}}' recommendation",
+        "description": "检查 recommendation 容器重启/OOM 状态"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "RestartCount=0 OOMKilled=false Status=running StartedAt=2026-09-02T13:31:59.017930657Z",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs frontend --tail 300 2>&1 | grep -i -E \"recommend|error|fail|timeout\" | tail -60",
+        "description": "查看 frontend 日志中与 recommendation 相关的错误"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:cart:7070)\n  details: 'Name resolution failed for target dns:cart:7070',\nError: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001)\n    at <unknown> (.next/server/pages/api/recommendations.js:1:321)\n  details: 'Name resolution failed for target dns:recommendation:9001',\n ⨯ Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001)\n    at <unknown> (.next/server/pages/api/recommendations.js:1:321)\n  details: 'Name resolution failed for target dns:recommendation:9001',\nError: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001)\n    at <unknown> (.next/server/pages/api/recommendations.js:1:321)\n  details: 'Name resolution failed for target dns:recommendation:9001',\n ⨯ Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001)\n    at <unknown> (.next/server/pages/api/recommendations.js:1:321)\n  details: 'Name resolution failed for target dns:recommendation:9001',\nError: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001)\n    at <unknown> (.next/server/pages/api/recommendations.js:1:321)\n  details: 'Name resolution failed for target dns:recommendation:9001',\n ⨯ Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001)\n    at <unknown> (.next/server/pages/api/recommendations.js:1:321)\n  details: 'Name resolution failed for target dns:recommendation:9001',\nError: 14 UNAVAILABLE: Name resolution failed for target dns:cart:7070\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:cart:7070)\n  details: 'Name resolution failed for target dns:cart:7070',\n ⨯ Error: 14 UNAVAILABLE: Name resolution failed for target dns:cart:7070\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:cart:7070)\n  details: 'Name resolution failed for target dns:cart:7070',\nError: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001)\n    at <unknown> (.next/server/pages/api/recommendations.js:1:321)\n  details: 'Name resolution failed for target dns:recommendation:9001',\n ⨯ Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001)\n    at <unknown> (.next/server/pages/api/recommendations.js:1:321)\n  details: 'Name resolution failed for target dns:recommendation:9001',\nError: 14 UNAVAILABLE: Name resolution failed for target dns:cart:7070\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:cart:7070)\n  details: 'Name resolution failed for target dns:cart:7070',\n ⨯ Error: 14 UNAVAILABLE: Name resolution failed for target dns:cart:7070\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:cart:7070)\n  details: 'Name resolution failed for target dns:cart:7070',\nError: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001)\n    at <unknown> (.next/server/pages/api/recommendations.js:1:321)\n  details: 'Name resolution failed for target dns:recommendation:9001',\n ⨯ Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001)\n    at <unknown> (.next/server/pages/api/recommendations.js:1:321)\n  details: 'Name resolution failed for target dns:recommendation:9001',\nError: 14 UNAVAILABLE: Name resolution failed for target dns:cart:7070\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:cart:7070)\n  details: 'Name resolution failed for target dns:cart:7070',\n ⨯ Error: 14 UNAVAILABLE: Name resolution failed for target dns:cart:7070\n    at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:cart:7070)\n  details: 'Name resolution failed for target dns:cart:7070',",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs frontend --tail 300 -t 2>&1 | grep -i \"recommendation:9001\" | tail -5\necho \"---\"\ndocker logs frontend --since 15m -t 2>&1 | grep -iE \"recommend|error|fail\" | tail -30",
+        "description": "检查 frontend 日志时间戳与最近15分钟的错误"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "2026-08-18T12:42:28.834917016Z     at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001)\n2026-08-18T12:42:28.834920817Z   details: 'Name resolution failed for target dns:recommendation:9001',\n2026-08-18T12:42:28.835527161Z  ⨯ Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001\n2026-08-18T12:42:28.835532693Z     at <unknown> (Error: 14 UNAVAILABLE: Name resolution failed for target dns:recommendation:9001)\n2026-08-18T12:42:28.835543631Z   details: 'Name resolution failed for target dns:recommendation:9001',\n---",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd aiops-agentic-rl/AIops-agent/workspace/recommendation 2>/dev/null && grep -rn \"recommendationCacheFailure\\|CacheFailure\\|cache\" --include=\"*.py\" -i . | head -40",
+        "description": "在 recommendation 服务代码中查找 recommendationCacheFailure 相关逻辑"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "./test_recommendation.py:5:version this FAILS; after 代码修复 Agent's fix (bounded deque / no cache) it PASSES — which is\n./recommendation_server.py:19:# Bounded cache: caps memory regardless of request volume.\n./recommendation_server.py:58:                \"# HELP recommendation_seen_ids_total tracked product ids (bounded cache)\\n\"\nShell cwd was reset to aiops-agentic-rl/AIops-agent",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "ls -la aiops-agentic-rl/AIops-agent/workspace/recommendation/ 2>/dev/null\necho \"---git log---\"\ncd aiops-agentic-rl/AIops-agent/workspace/recommendation 2>/dev/null && git log --oneline -10",
+        "description": "列出 recommendation 仓库文件与最近提交"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "total 48\ndrwxr-xr-x@  9 user  staff   288  8月 19 11:18 .\ndrwxr-xr-x@  3 user  staff    96  8月 19 11:17 ..\ndrwxr-xr-x@ 15 user  staff   480  9月  2 21:30 .git\ndrwxr-xr-x@  6 user  staff   192  8月 19 11:18 .pytest_cache\n-rw-r--r--@  1 user  staff   462  8月 19 11:17 Dockerfile\n-rw-r--r--@  1 user  staff   390  8月 19 11:17 README.md\n-rw-r--r--@  1 user  staff  4611  8月 19 11:18 recommendation_server.py\n-rw-r--r--@  1 user  staff    12  8月 19 11:17 requirements.txt\n-rw-r--r--@  1 user  staff  1246  8月 19 11:17 test_recommendation.py\n---git log---\n16837d0 fix: bound _seen_product_ids to stop unbounded memory growth\nf18f452 perf: track all seen product ids for analytics\nac26792 recommendation service baseline (bounded recent-id cache)\nShell cwd was reset to aiops-agentic-rl/AIops-agent",
+      "signal_types_covered": [
+        "git_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "recommendation 服务的功能开关 recommendationCacheFailure 已通过 flagd 静态覆盖设为 true（OFREP 实测 value=true, reason=STATIC, variant=on），与告警描述的\"一次功能开关变更后缓存层失效\"完全吻合。该服务代码仓库（workspace/recommendation）当前只有一次内存泄漏修复相关的提交（16837d0/f18f452/ac26792），近期无代码发版，符合告警\"没有伴随代码发版\"的说明，排除了代码回归。frontend/recommendation 容器均未见 OOMKilled、RestartCount=0，Jaeger 中未捕获到该窗口内 recommendation 相关的下游报错 span（仅有历史 flagd EventStream 噪声及 2026-08-18 的陈旧 DNS 报错，与本次告警时间线无关），说明当前采样窗口内没有直接的失败调用链佐证，根因主要靠 flagd 开关状态坐实。真正的止血手段是把 recommendationCacheFailure 这个 flagd 功能开关改回 off/关闭，这是一次 flag 配置回退操作，不属于当前 docker 白名单（restart_instance/migrate_instance/scale_resources 均无法复位 flagd 中的静态覆盖值，重启 recommendation 容器不会改变 flagd 的开关状态），因此本次未自动执行任何处置，建议人工在 flagd 管理侧关闭该开关。",
+        "kind": "config",
+        "suspect_service": "recommendation",
+        "remediation_type": "online_op",
+        "also_code_fix": false,
+        "remediation_detail": "建议：由人工/flagd 管理侧将功能开关 recommendationCacheFailure 从 on 改回 off（flagd 配置回退），使 recommendation 缓存层恢复正常，上游调用成功率应随之回升。未执行任何自动处置：本次故障根因是 flagd 静态开关覆盖，而非容器资源/进程状态问题；docker 白名单里的 restart_instance/migrate_instance/scale_resources 三种操作都不能复位 flagd 中的 flag 值（重启或重建 recommendation 容器后，flagd 仍会按当前静态配置把该 flag 评估为 true，缓存失效会立即复现），不属于可低风险自动执行的处置范围，故转交人工在 flagd 侧回退该开关。",
+        "confidence": 0.62,
+        "evidence": [
+          "OFREP 实测：curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/recommendationCacheFailure' 返回 {\"value\":true,\"key\":\"recommendationCacheFailure\",\"reason\":\"STATIC\",\"variant\":\"on\"} —— 开关当前确实被静态覆盖为开启，与告警描述的触发条件一致",
+          "docker inspect recommendation: RestartCount=0, OOMKilled=false, Status=running —— 排除内存/进程崩溃类根因",
+          "workspace/recommendation 的 git log 仅有 16837d0/f18f452/ac26792 三次与内存泄漏修复相关的提交，无近期发版，与告警 annotations 中'没有伴随代码发版'的描述一致，且 grep 全仓库未找到 recommendationCacheFailure 的代码引用，说明该 flag 是纯配置层开关，非代码逻辑分支",
+          "Jaeger: curl 'http://localhost:16686/jaeger/ui/api/traces?service=recommendation&tags={\"error\":\"true\"}&lookback=3h' 20 条结果全部是 /flagd.evaluation.v2.Service/EventStream 的历史噪声（flagd UNIMPLEMENTED/404），未见业务性 GetRecommendations/ListRecommendations 报错 span；frontend 近15分钟日志无 recommendation 相关报错（此前 2026-08-18 的 DNS 解析失败日志与本次告警时间线无关），当前采样窗口内缺乏直接的失败调用链证据，因此调低 confidence",
+          "Prometheus: traces_span_metrics_calls_total{service_name=\"recommendation\"} 仅返回 flagd EventStream 的 STATUS_CODE_ERROR 系列（历史累计值），未发现 ListRecommendations 相关的错误计数指标"
+        ],
+        "suspect_repo": null,
+        "suspect_commit_hint": null,
+        "suspect_file_hint": null
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "prometheus",
+        "jaeger",
+        "kubectl_status",
+        "git_history"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ]
+}

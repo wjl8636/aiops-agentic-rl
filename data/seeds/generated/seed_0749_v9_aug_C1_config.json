@@ -1,0 +1,15 @@
+{
+  "alertname": "HomepageImagesThrottled",
+  "service": "frontend",
+  "labels": {
+    "service": "frontend",
+    "severity": "warning",
+    "job": "frontend"
+  },
+  "annotations": {
+    "summary": "首页商品图片加载耗时被拉高到数秒",
+    "description": "frontend 首页商品图片的加载耗时被明显拉高（imageSlowLoad 开关疑似被设为 10sec 档），RUM 侧图片加载耗时从 200ms 涨到数秒，页面跳出率抬头。frontend 服务自身延迟与错误率正常，无发版记录。请定位确认后给出处置建议。"
+  },
+  "startsAt": "2026-09-04T19:15:00Z",
+  "scenario_hint": "[v9增强/C1_早收敛] flag=imageSlowLoad：单 flag、单服务、证据链清晰——验证「Skill → OFREP 查 flag → 1-2 步旁证 → 收敛，总步数 ≤8」的效率目标行为"
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "AdP99LatencyBudgetExceeded",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "ad 服务 p99 延迟持续超出预算，伴随偶发 GC 毛刺",
+    "description": "ad 服务请求 p99 从 80ms 持续抬升到 600ms+，延迟预算长期超支，期间还能观察到零星的GC 停顿毛刺。容器 CPU 读数看起来并不高，但延迟劣化是真实的，怀疑负载被人为注入（adHighCpu 开关）。广告位超时会直接减少收入，请交叉核实 CPU 与开关状态后给出结论。"
+  },
+  "startsAt": "2026-09-06T19:05:00Z",
+  "scenario_hint": "[v9增强/B1a_交叉验证] flags=adHighCpu：注入真实故障但观测信号降级（Prometheus lag 冻结/ad 机制不生效/后端不可观测），OFREP 是权威第一信源——验证「OFREP 查 flag → Prometheus 读数正常不据此否定 → 换第二信源交叉验证 → 收敛输出 kind/route/confidence，不执行白名单外操作」"
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "MemberPriceComplaintFromUsers",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "客服陆续接到「会员价和实际扣款差一分钱」的用户投诉",
+    "description": "客服渠道陆续接到用户投诉：结算页展示的会员价比实际扣款少一分钱（展示 499 分、实扣500 分这类），集中在带折扣的订单上。监控上没有任何指标异常（错误率 0、延迟正常、无资源问题），纯业务侧报障。开发已在预发按用户路径复现：折扣后金额落在 .5 分边界时展示价一律向下少 1 分。业务确认这是金额展示 bug，需要改代码修复，请定位到具体代码。"
+  },
+  "startsAt": "2026-09-06T19:20:00Z",
+  "scenario_hint": "[v9增强/D2_用户报障] suspect_file=pricing.py：客服/运营报障叙事（无指标异常），bug 在 master 的新文件里——验证「无指标信号时仍能正确定位代码根因判 code_fix，而不是误判成线上操作」"
+}

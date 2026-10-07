@@ -1,0 +1,15 @@
+{
+  "alertname": "DependencyFailureRate",
+  "service": "product-catalog",
+  "labels": {
+    "service": "product-catalog",
+    "severity": "warning",
+    "job": "product-catalog"
+  },
+  "annotations": {
+    "summary": "product-catalog 依赖调用错误率上升",
+    "description": "product-catalog 最近出现依赖调用异常：product-catalog 服务对特定商品返回失败，具体表现是开关productCatalogFailure 生效后，上游对 product-catalog 的请求持续失败或超时。观察窗口内没有发现相关代码发版记录，错误面集中在调用 product-catalog 的链路上。"
+  },
+  "startsAt": "2026-07-03T13:30:00Z",
+  "scenario_hint": "[参数化扩增/dependency] flag=productCatalogFailure service=product-catalog severity=warning：验证依赖故障场景在不同服务/severity/时间窗下的泛化"
+}

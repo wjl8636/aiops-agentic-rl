@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "warning",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "历史工单反演：hist-2026-01-notification-consumer-scale-down",
+    "description": "2026-01 的一次事故：一次误操作把通知消费者组的副本数从 4 缩到了 1，生产速率不变但消费能力骤降，consumer lag 迅速堆积，通知发送明显滞后。"
+  },
+  "startsAt": "2026-07-22T20:45:00Z",
+  "scenario_hint": "[历史工单反演/static] source_ticket=hist-2026-01-notification-consumer-scale-down：从手写历史工单摘要样例反向抽取的告警（Milvus 检索池不足时的静态兜底）"
+}

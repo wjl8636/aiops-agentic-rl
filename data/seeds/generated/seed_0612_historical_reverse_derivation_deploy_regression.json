@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0058-recommendation-deploy_regression",
+    "description": "recommendation 服务在最新发版 (image/sha=e482193，deploys.log 标记 LATEST_DEPLOY suspect，替换 baseline f8a6666) 后内存单调上升并反复 OOM/重启。根因是 recommendation_server.py 中模块级列表 _seen_product_ids 每次 get_recommendations 被无界 extend、从不裁剪，128MB 上限下工作集持续增长直至 OOMKilled。混合根因：可先回滚到 baseline f8a6666 止血，彻底修复需改代码为该缓存加界。"
+  },
+  "startsAt": "2026-07-21T04:15:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0058-recommendation-deploy_regression：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

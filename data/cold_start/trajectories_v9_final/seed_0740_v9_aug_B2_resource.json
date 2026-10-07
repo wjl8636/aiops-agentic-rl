@@ -1,0 +1,262 @@
+{
+  "alert": {
+    "alertname": "CurrencyCpuBaselineDriftInfo",
+    "service": "currency",
+    "labels": {
+      "service": "currency",
+      "severity": "info",
+      "job": "currencyservice"
+    },
+    "annotations": {
+      "summary": "currency CPU 比上周基线高 6%，处于阈值边缘反复触发",
+      "description": "currency 容器 CPU 使用率比上周同期基线高约 6%，恰好卡在新调的 info 级阈值边缘，过去 1 小时内反复触发又自动恢复 4 次。换算接口成功率、延迟、错误率均正常，无用户影响。请判断这是需要关注的趋势还是监控阈值敏感导致的噪声。"
+    },
+    "startsAt": "2026-09-07T13:55:00Z",
+    "scenario_hint": "[v9增强/B2_噪声info级] kind=resource service=currency：不注入任何故障，info 级阈值敏感度叙事（A1 的姊妹型）——验证「查过→确认无异常→info_only」，与 B1 的「有故障但看不清」形成对照"
+  },
+  "alert_id": "seed_0740_v9_aug_B2_resource",
+  "final_diagnosis": {
+    "summary": "currency 的 CPU 基线漂移 info 告警系监控阈值敏感导致的噪声,非真实故障:实时 CPU 仅 0.54%、流量平稳、错误率为 0、p99 毫秒级、无重启/OOM/发版。告警卡在新调的 info 阈值边缘,1h 内自愈 4 次,周环比 ~6% 属自然漂移。无用户影响,无需对 currency 做任何线上处置,建议调整监控阈值/加滞回。",
+    "kind": "config",
+    "suspect_service": "currency",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "info_only",
+    "remediation_detail": "根因在监控阈值配置过于敏感(新调的 info 级 CPU 阈值贴着 currency 的自然 CPU 基线,周环比 ~6% 的正常漂移即反复触发又自愈),非 currency 服务本身故障。不需要对 currency 工作负载执行任何线上处置——重启/扩容只会掩盖噪声且无收益,故未执行任何白名单处置。建议监控侧动作(交人工):(1) 上调该 info 阈值使其高于自然基线波动带,或改用周环比相对阈值;(2) 增加滞回(hysteresis)或延长持续触发窗口(如需连续 N 分钟越线才告警),消除边缘抖动;(3) 若确需观察 CPU 趋势,补一条真实 CPU 采集指标(当前 currency 在 Prometheus 无 CPU 指标,cAdvisor 缺失),用趋势而非瞬时阈值判断。",
+    "confidence": 0.8,
+    "evidence": [
+      "docker stats --no-stream(currency): CPU 0.54%, MEM 2.898MiB/20MiB —— 实时 CPU 极低,不存在资源耗尽,与'CPU 高'的直观预期矛盾",
+      "docker inspect currency: RestartCount=0, OOMKilled=false, StartedAt=2026-08-18(运行 2 周+未重启)—— 排除崩溃/OOM/近期重调度",
+      "deploys.log 无 currency 记录 + 镜像 tag 为 latest-currency —— 无近期发版,排除 deploy_regression",
+      "PromQL sum(rate(traces_span_metrics_calls_total{service_name=\"currency\"}[5m])) query_range 近2h: [2.586,2.668,...,2.455,2.414,1.859] 稳定在 ~2.5 rps —— 流量平稳无上涨,非流量驱动型 CPU 升高",
+      "PromQL traces_span_metrics_calls_total{service_name=\"currency\",status_code=\"STATUS_CODE_ERROR\"}: NO ERRORS —— 错误率为 0,佐证告警'换算接口成功率/错误率正常、无用户影响'",
+      "PromQL histogram_quantile(0.99,...duration_milliseconds_bucket{service_name=\"currency\"}) 近2h: 8~38ms 区间毫秒级小抖动 —— p99 绝对值极小,无实质延迟劣化",
+      "docker logs currency --since 2m 行数=0(--tail 40 无异常/无报错刷屏)—— 排除历史工单[1]的'配置误设致高频轮询死循环'场景(该场景会伴随 CPU 持续高位+日志刷屏)",
+      "Prometheus 中 currency 仅有 app_currency_counter_total 与 traces_span_metrics_* ,无任何 CPU 指标(cAdvisor 缺失)—— 告警的'+6%'为告警引擎的周环比基线比较,无独立 CPU 时序可交叉验证瞬时值",
+      "search_past_incidents: 最相似历史工单[1](currency/resource, 相似度0.702)为'配置误设致高频轮询、CPU 持续处于高位',其特征(持续高位)与本次(CPU 实时低+反复自愈+流量平稳)不符,已排除",
+      "告警元数据: severity=info, description 明确'卡在新调的 info 级阈值边缘、1h 内反复触发又自动恢复 4 次、无用户影响' —— 边缘抖动+自愈的模式是阈值敏感噪声的典型特征"
+    ],
+    "time_window": {
+      "from": "2026-09-07T13:55:00Z",
+      "to": "2026-09-08T00:00:00Z"
+    },
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "info_only",
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"currency 的 CPU 基线漂移 info 告警系监控阈值敏感导致的噪声,非真实故障:实时 CPU 仅 0.54%、流量平稳、错误率为 0、p99 毫秒级、无重启/OOM/发版。告警卡在新调的 info 阈值边缘,1h 内自愈 4 次,周环比 ~6% 属自然漂移。无用户影响,无需对 currency 做任何线上处置,建议调整监控阈值/加滞回。\",\"kind\":\"config\",\"suspect_service\":\"currency\",\"remediation_type\":\"info_only\",\"remediation_detail\":\"根因在监控阈值配置过于敏感(新调的 info 级 CPU 阈值贴着 currency 的自然 CPU 基线,周环比 ~6% 的正常漂移即反复触发又自愈),非 currency 服务本身故障。不需要对 currency 工作负载执行任何线上处置——重启/扩容只会掩盖噪声且无收益,故未执行任何白名单处置。建议监控侧动作(交人工):(1) 上调该 info 阈值使其高于自然基线波动带,或改用周环比相对阈值;(2) 增加滞回(hysteresis)或延长持续触发窗口(如需连续 N 分钟越线才告警),消除边缘抖动;(3) 若确需观察 CPU 趋势,补一条真实 CPU 采集指标(当前 currency 在 Prometheus 无 CPU 指标,cAdvisor 缺失),用趋势而非瞬时阈值判断。\",\"confidence\":0.8,\"suspect_repo\":null,\"suspect_commit_hint\":null,\"suspect_file_hint\":null,\"also_code_fix\":false,\"evidence\":[\"docker stats --no-stream(currency): CPU 0.54%, MEM 2.898MiB/20MiB —— 实时 CPU 极低,不存在资源耗尽,与'CPU 高'的直观预期矛盾\",\"docker inspect currency: RestartCount=0, OOMKilled=false, StartedAt=2026-08-18(运行 2 周+未重启)—— 排除崩溃/OOM/近期重调度\",\"deploys.log 无 currency 记录 + 镜像 tag 为 latest-currency —— 无近期发版,排除 deploy_regression\",\"PromQL sum(rate(traces_span_metrics_calls_total{service_name=\\\"currency\\\"}[5m])) query_range 近2h: [2.586,2.668,...,2.455,2.414,1.859] 稳定在 ~2.5 rps —— 流量平稳无上涨,非流量驱动型 CPU 升高\",\"PromQL traces_span_metrics_calls_total{service_name=\\\"currency\\\",status_code=\\\"STATUS_CODE_ERROR\\\"}: NO ERRORS —— 错误率为 0,佐证告警'换算接口成功率/错误率正常、无用户影响'\",\"PromQL histogram_quantile(0.99,...duration_milliseconds_bucket{service_name=\\\"currency\\\"}) 近2h: 8~38ms 区间毫秒级小抖动 —— p99 绝对值极小,无实质延迟劣化\",\"docker logs currency --since 2m 行数=0(--tail 40 无异常/无报错刷屏)—— 排除历史工单[1]的'配置误设致高频轮询死循环'场景(该场景会伴随 CPU 持续高位+日志刷屏)\",\"Prometheus 中 currency 仅有 app_currency_counter_total 与 traces_span_metrics_* ,无任何 CPU 指标(cAdvisor 缺失)—— 告警的'+6%'为告警引擎的周环比基线比较,无独立 CPU 时序可交叉验证瞬时值\",\"search_past_incidents: 最相似历史工单[1](currency/resource, 相似度0.702)为'配置误设致高频轮询、CPU 持续处于高位',其特征(持续高位)与本次(CPU 实时低+反复自愈+流量平稳)不符,已排除\",\"告警元数据: severity=info, description 明确'卡在新调的 info 级阈值边缘、1h 内反复触发又自动恢复 4 次、无用户影响' —— 边缘抖动+自愈的模式是阈值敏感噪声的典型特征\"],\"time_window\":{\"from\":\"2026-09-07T13:55:00Z\",\"to\":\"2026-09-08T00:00:00Z\"}}",
+    "teacher_model": "claude-4.8-opus-google",
+    "usage": {
+      "input_tokens": 2900,
+      "output_tokens": 7416,
+      "cache_creation_input_tokens": 80784,
+      "cache_read_input_tokens": 149757
+    },
+    "cost_usd": 0.7796784999999999,
+    "num_turns": 12,
+    "duration_ms": 131033,
+    "model_usage": {
+      "claude-4.8-opus-google": {
+        "inputTokens": 2900,
+        "outputTokens": 7416,
+        "cacheReadInputTokens": 149757,
+        "cacheCreationInputTokens": 80784,
+        "webSearchRequests": 0,
+        "costUSD": 0.7796784999999999,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000,
+        "canonicalModel": "claude-4.8-opus-google",
+        "provider": "firstParty"
+      }
+    },
+    "pruning": {
+      "steps_before": 10,
+      "steps_after": 10,
+      "removed": [],
+      "restored_by_verification": []
+    }
+  },
+  "steps": [
+    {
+      "tool_name": "Skill",
+      "tool_input": {
+        "skill": "resource-cpu"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Launching skill: resource-cpu",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps --format '{{.Names}}\\t{{.Status}}' | grep -i currency; echo \"---stats---\"; docker stats --no-stream --format '{{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}' | grep -i currency",
+        "description": "Check currency container status and live stats"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "currency\tUp 2 weeks\n---stats---\ncurrency\t0.54%\t2.898MiB / 20MiB",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== available metrics for currency ===\"; curl -s --data-urlencode 'query={service_name=\"currency\"}' 'http://localhost:9090/api/v1/query' | python3 -c \"import sys,json; d=json.load(sys.stdin); print('\\n'.join(sorted(set(r['metric'].get('__name__','?') for r in d['data']['result']))))\" 2>/dev/null || curl -s --data-urlencode 'query={service_name=\"currency\"}' 'http://localhost:9090/api/v1/query'",
+        "description": "List currency metrics in Prometheus"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== available metrics for currency ===\napp_currency_counter_total\ntraces_span_metrics_calls_total\ntraces_span_metrics_duration_milliseconds_bucket\ntraces_span_metrics_duration_milliseconds_count\ntraces_span_metrics_duration_milliseconds_sum",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== restart count / OOM ===\"; docker inspect --format '{{.RestartCount}} OOM={{.State.OOMKilled}} Started={{.State.StartedAt}}' currency",
+        "description": "Check restart count and OOM status"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== restart count / OOM ===\n0 OOM=false Started=2026-08-18T08:02:59.296064434Z",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== error calls last 1h ===\"; curl -s -g --data-urlencode 'query=traces_span_metrics_calls_total{service_name=\"currency\",status_code=\"STATUS_CODE_ERROR\"}' 'http://localhost:9090/api/v1/query' | python3 -c \"import sys,json;d=json.load(sys.stdin);print([ (r['metric'].get('span_name'),r['value'][1]) for r in d['data']['result']] or 'NO ERRORS')\"\necho \"=== total calls (all status) ===\"; curl -s -g --data-urlencode 'query=sum(traces_span_metrics_calls_total{service_name=\"currency\"})' 'http://localhost:9090/api/v1/query' | python3 -c \"import sys,json;d=json.load(sys.stdin);print(d['data']['result'])\"\necho \"=== call rate trend last 2h (5m step) ===\"; curl -s -g --data-urlencode 'query=sum(rate(traces_span_metrics_calls_total{service_name=\"currency\"}[5m]))' --data-urlencode \"start=$(date -u -v-2H +%s)\" --data-urlencode \"end=$(date -u +%s)\" --data-urlencode 'step=300' 'http://localhost:9090/api/v1/query_range' | python3 -c \"import sys,json;d=json.load(sys.stdin);r=d['data']['result'];print([round(float(v[1]),3) for v in r[0]['values']] if r else 'EMPTY')\"",
+        "description": "Query error rate, total calls, and traffic trend"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== error calls last 1h ===\nNO ERRORS\n=== total calls (all status) ===\n[{'metric': {}, 'value': [1788849911.793, '57057']}]\n=== call rate trend last 2h (5m step) ===\n[2.586, 2.668, 2.789, 2.559, 2.472, 2.555, 2.618, 2.593, 2.539, 2.647, 2.684, 2.198, 1.125, 2.801, 2.493, 2.448, 2.626, 2.397, 2.168, 2.726, 1.722, 2.297, 2.455, 2.414, 1.859]",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== p99 latency trend last 2h ===\"; curl -s -g --data-urlencode 'query=histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"currency\"}[5m])))' --data-urlencode \"start=$(date -u -v-2H +%s)\" --data-urlencode \"end=$(date -u +%s)\" --data-urlencode 'step=300' 'http://localhost:9090/api/v1/query_range' | python3 -c \"import sys,json;d=json.load(sys.stdin);r=d['data']['result'];print([round(float(v[1]),1) for v in r[0]['values']] if r else 'EMPTY')\"",
+        "description": "Query p99 latency trend"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== p99 latency trend last 2h ===\n[8.0, 9.8, 7.9, 14.9, 10.5, 8.0, 8.9, 8.4, 8.0, 9.3, 9.3, 9.6, 28.4, 23.1, 20.1, 9.7, 38.5, 37.9, 36.1, 29.9, 29.3, 39.4, 31.9, 37.8, 32.2]",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== deploys.log currency ===\"; find . -name 'deploys.log' 2>/dev/null | head; cat deploys.log 2>/dev/null | grep -i currency | tail -5; echo \"=== currency image ===\"; docker inspect --format '{{.Config.Image}}' currency",
+        "description": "Check recent deploys for currency"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== deploys.log currency ===\n./deploys.log\n=== currency image ===\nghcr.nju.edu.cn/open-telemetry/demo:latest-currency",
+      "signal_types_covered": [
+        "logs",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "mcp__aiops_rag__search_past_incidents",
+      "tool_input": {
+        "query": "currency 服务 CPU 比基线略高 6% 卡在阈值边缘反复触发又自动恢复 info 级噪声 无用户影响",
+        "top_k": 3
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "检索到以下历史相似诊断工单（按相似度降序）：\n\n[1] 相似度=0.702 | 服务=currency | 类型=resource | 当时走向=feishu_online_op\n    根因摘要: currency 的汇率缓存刷新间隔被一次配置变更误设成了远小于原值的数字，导致服务陷入接近死循环式的高频轮询拉取汇率，CPU 使用率持续处于高位，没有伴随代码发版。\n    处置: 已发飞书卡片提示人工把汇率缓存刷新间隔配置改回原值；临时可执行docker update --cpus 1.5 currency 缓解压力。\n[2] 相似度=0.6989 | 服务=currency | 类型=dependency | 当时走向=feishu_online_op\n    根因摘要: currency 依赖外部汇率服务商拉取实时汇率，这次调用没有配超时；服务商一次维护窗口期间响应大幅变慢，currency 的请求处理线程逐个卡在等待汇率响应上，价格换算接口整体超时，checkout 结算页汇率展示报错。\n    处置: 已发飞书卡片提示人工执行 docker restart currency；建议给汇率拉取调用补上超时，超时后用上一次成功拉取到的汇率缓存值兜底。\n[3] 相似度=0.6689 | 服务=ad | 类型=resource | 当时走向=auto_remediated\n    根因摘要: ad 服务的一次运行时参数配置变更间接改变了 GC 触发频率，变更后 CPU 使用率持续处于高位，请求延迟 p99 明显上升，但没有伴随代码发版。\n    处置: 已自动执行 kubectl set resources deploy/ad --limits=cpu=1500m 临时抬高CPU 上限缓解压力；建议把 GC 触发频率相关参数改回原值。\n\n注意：历史工单仅供参考，请结合当前实时观测证据独立判断，不要盲目照搬。",
+      "signal_types_covered": [
+        "rag_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== currency logs tail (look for tight loop / repeated fetch / errors) ===\"; docker logs currency --tail 40 2>&1 | tail -40; echo \"=== log line count last 2min (rough rate) ===\"; docker logs currency --since 2m 2>&1 | wc -l",
+        "description": "Check currency logs for tight loop or anomaly"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== currency logs tail (look for tight loop / repeated fetch / errors) ===\n=== log line count last 2min (rough rate) ===\n       0",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "currency 的 CPU 基线漂移 info 告警系监控阈值敏感导致的噪声,非真实故障:实时 CPU 仅 0.54%、流量平稳、错误率为 0、p99 毫秒级、无重启/OOM/发版。告警卡在新调的 info 阈值边缘,1h 内自愈 4 次,周环比 ~6% 属自然漂移。无用户影响,无需对 currency 做任何线上处置,建议调整监控阈值/加滞回。",
+        "kind": "config",
+        "suspect_service": "currency",
+        "remediation_type": "info_only",
+        "remediation_detail": "根因在监控阈值配置过于敏感(新调的 info 级 CPU 阈值贴着 currency 的自然 CPU 基线,周环比 ~6% 的正常漂移即反复触发又自愈),非 currency 服务本身故障。不需要对 currency 工作负载执行任何线上处置——重启/扩容只会掩盖噪声且无收益,故未执行任何白名单处置。建议监控侧动作(交人工):(1) 上调该 info 阈值使其高于自然基线波动带,或改用周环比相对阈值;(2) 增加滞回(hysteresis)或延长持续触发窗口(如需连续 N 分钟越线才告警),消除边缘抖动;(3) 若确需观察 CPU 趋势,补一条真实 CPU 采集指标(当前 currency 在 Prometheus 无 CPU 指标,cAdvisor 缺失),用趋势而非瞬时阈值判断。",
+        "confidence": 0.8,
+        "suspect_repo": null,
+        "suspect_commit_hint": null,
+        "suspect_file_hint": null,
+        "also_code_fix": false,
+        "evidence": [
+          "docker stats --no-stream(currency): CPU 0.54%, MEM 2.898MiB/20MiB —— 实时 CPU 极低,不存在资源耗尽,与'CPU 高'的直观预期矛盾",
+          "docker inspect currency: RestartCount=0, OOMKilled=false, StartedAt=2026-08-18(运行 2 周+未重启)—— 排除崩溃/OOM/近期重调度",
+          "deploys.log 无 currency 记录 + 镜像 tag 为 latest-currency —— 无近期发版,排除 deploy_regression",
+          "PromQL sum(rate(traces_span_metrics_calls_total{service_name=\"currency\"}[5m])) query_range 近2h: [2.586,2.668,...,2.455,2.414,1.859] 稳定在 ~2.5 rps —— 流量平稳无上涨,非流量驱动型 CPU 升高",
+          "PromQL traces_span_metrics_calls_total{service_name=\"currency\",status_code=\"STATUS_CODE_ERROR\"}: NO ERRORS —— 错误率为 0,佐证告警'换算接口成功率/错误率正常、无用户影响'",
+          "PromQL histogram_quantile(0.99,...duration_milliseconds_bucket{service_name=\"currency\"}) 近2h: 8~38ms 区间毫秒级小抖动 —— p99 绝对值极小,无实质延迟劣化",
+          "docker logs currency --since 2m 行数=0(--tail 40 无异常/无报错刷屏)—— 排除历史工单[1]的'配置误设致高频轮询死循环'场景(该场景会伴随 CPU 持续高位+日志刷屏)",
+          "Prometheus 中 currency 仅有 app_currency_counter_total 与 traces_span_metrics_* ,无任何 CPU 指标(cAdvisor 缺失)—— 告警的'+6%'为告警引擎的周环比基线比较,无独立 CPU 时序可交叉验证瞬时值",
+          "search_past_incidents: 最相似历史工单[1](currency/resource, 相似度0.702)为'配置误设致高频轮询、CPU 持续处于高位',其特征(持续高位)与本次(CPU 实时低+反复自愈+流量平稳)不符,已排除",
+          "告警元数据: severity=info, description 明确'卡在新调的 info 级阈值边缘、1h 内反复触发又自动恢复 4 次、无用户影响' —— 边缘抖动+自愈的模式是阈值敏感噪声的典型特征"
+        ],
+        "time_window": {
+          "from": "2026-09-07T13:55:00Z",
+          "to": "2026-09-08T00:00:00Z"
+        }
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "prometheus",
+        "logs",
+        "kubectl_status",
+        "rag_history"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ]
+}

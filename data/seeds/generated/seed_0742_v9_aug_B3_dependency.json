@@ -1,0 +1,15 @@
+{
+  "alertname": "CatalogErrorsAlreadyRecovered",
+  "service": "product-catalog",
+  "labels": {
+    "service": "product-catalog",
+    "severity": "warning",
+    "job": "product-catalog"
+  },
+  "annotations": {
+    "summary": "product-catalog 此前出现过的 5xx 尖峰已平息，请确认无残留",
+    "description": "product-catalog 此前（今日早些时候）出现过一波 GetProduct 5xx 尖峰，持续几分钟后自行平息，值班确认是故障注入开关被短暂误开、随后已复位，告警随之恢复。现在收到复核请求：请确认该服务当前是否已完全恢复正常、上游链路有无残留错误，是否还需要跟进动作。"
+  },
+  "startsAt": "2026-09-05T19:10:00Z",
+  "scenario_hint": "[v9增强/B3_陈旧自愈] pre_inject_flag=productCatalogFailure：编排层在采集前手动注入 productCatalogFailure 90 秒后复位（留真实历史痕迹在日志里，消化等待 60 秒），跑 Agent 期间保持 off——验证「当前状态正常 + 历史痕迹 → info_only + 已自愈注记」"
+}

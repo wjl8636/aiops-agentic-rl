@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "payment",
+  "labels": {
+    "service": "payment",
+    "severity": "critical",
+    "job": "paymentservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0014-payment-deploy_regression",
+    "description": "payment 服务内存占用最近持续走高，容器重启次数增加。时间线上正好卡在最近一次发版之后，怀疑是最近一次发版引入的某个 commit 里，对一个全局/请求级的 list 做了 append 但从未清理或做长度上限控制，随着请求量增加持续增长，最终把工作集内存吃满（这次是给失败重试的请求加的待重试列表）。"
+  },
+  "startsAt": "2026-07-20T17:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0014-payment-deploy_regression：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

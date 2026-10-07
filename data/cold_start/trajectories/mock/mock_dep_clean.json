@@ -1,0 +1,119 @@
+{
+  "alert": {
+    "alertname": "MockHighErrorRate",
+    "service": "product-catalog",
+    "labels": {
+      "service": "product-catalog",
+      "severity": "critical",
+      "job": "product-catalog"
+    },
+    "annotations": {
+      "summary": "product-catalog GetProduct 5xx 飙升",
+      "description": "flagd productCatalogFailure 开关翻转后，product-catalog 依赖调用失败率飙升，上游 recommendation/frontend 大量报错。"
+    },
+    "startsAt": "2026-06-20T10:00:00Z"
+  },
+  "alert_id": "mock_dep_clean",
+  "steps": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "product-catalog   Up 2 hours (unhealthy)\nrecommendation    Up 3 hours",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s http://localhost:9090/api/v1/query?query=up{job=\"product-catalog\"}"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Prometheus: up{job=\"product-catalog\"} = 0，过去 5 分钟内错误率从 1% 跳升到 62%。",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s http://localhost:16686/api/traces?service=product-catalog&limit=5"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Jaeger: 最近 5 条 trace 全部在 GetProduct span 返回 UNAVAILABLE，下游未再往前传播，故障止在 product-catalog 自身。",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs --tail 50 product-catalog"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "ERROR flagd: feature flag 'productCatalogFailure' evaluated to true, injecting synthetic 5xx",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker restart product-catalog"
+      },
+      "hook_decision": "deny",
+      "hook_action": "restart_instance",
+      "hook_target": "product-catalog",
+      "observation": "PreToolUse hook 拒绝执行：低风险操作 restart_instance 命中，但目标 product-catalog 不在可自动处置白名单内，需改发飞书卡片交人工重启。",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    }
+  ],
+  "final_diagnosis": {
+    "summary": "flagd productCatalogFailure 开关注入的合成依赖故障，需重启 product-catalog 清除注入状态。",
+    "kind": "dependency",
+    "suspect_service": "product-catalog",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "online_op",
+    "remediation_detail": "建议重启 product-catalog 清除注入状态；product-catalog 不在自动处置白名单内，已改发飞书卡片交人工执行。",
+    "confidence": 0.88,
+    "evidence": [
+      "Prometheus up{job=\"product-catalog\"}=0，错误率从 1% 跳升到 62%",
+      "Jaeger 最近 5 条 trace 全部在 GetProduct span 返回 UNAVAILABLE",
+      "docker logs 显示 flagd productCatalogFailure 开关命中，注入合成 5xx"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "feishu_online_op",
+  "post_action_health": {
+    "checked": true,
+    "healthy": true,
+    "metric": "http_error_rate",
+    "window_s": 60
+  },
+  "meta": {
+    "source": "mock",
+    "degraded": null,
+    "raw": null
+  }
+}

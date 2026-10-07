@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0030-recommendation-config",
+    "description": "recommendation 的一个 A/B 测试流量分配开关被误配置成了全量导向实验组模型版本（本意只分配 5% 流量），没有对应的代码发版，人工把流量分配比例改回原值后恢复。"
+  },
+  "startsAt": "2026-07-20T20:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0030-recommendation-config：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

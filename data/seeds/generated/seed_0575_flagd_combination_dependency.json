@@ -1,0 +1,15 @@
+{
+  "alertname": "CheckoutFullyDown",
+  "service": "checkout",
+  "labels": {
+    "service": "checkout",
+    "severity": "critical",
+    "job": "checkoutservice"
+  },
+  "annotations": {
+    "summary": "checkout 下单链路整体不可用",
+    "description": "cart 服务失败（cartFailure）与 payment 服务整体不可达（paymentUnreachable）同时发生，checkout 调用这两个依赖均报错，下单链路事实上完全不可用。两个开关分属不同服务，checkout 自身代码没有变更，属于多点依赖故障组合导致的全链路失败。"
+  },
+  "startsAt": "2026-07-12T21:34:00Z",
+  "scenario_hint": "[flagd组合/多点] flags=cartFailure+paymentUnreachable：多个 flagd 故障开关同时注入构造的复合 dependency 场景"
+}

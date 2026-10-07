@@ -1,0 +1,705 @@
+{
+  "_purpose": "对 data/clean/split/train/ 下74条新种子做真实采集前的可行性核查:判断每条种子要求的故障机制在当前 AIops-agent 活环境里能否被 fault_injection.py 真实触发,避免在跑真实 Claude API 采集前为注定'环境侧什么都没发生'的场景浪费预算。A=已验证/可判定为真实可用机制;B=已知环境侧做不到或服务自身bug,翻flag也不可观测;C=拿不准/存在叙事矛盾或已知的路由缺口,需要人工在采集或GT标注阶段(任务#16)进一步处理。",
+  "_method": "1) 读 data/cold_start/fault_injection.py 的模块docstring和已验证结论(ad/recommendation client bug,productCatalogFailure/cartFailure/kafkaQueueProblems有效); 2) 读 data/cold_start/known_unsupported_seeds.json 了解上一批29条种子的排除模式(仅供参考机制边界,两批种子编号有重叠但内容不同,不能按编号直接复用结论); 3) 对本批74条新出现、docstring未覆盖的4个flag(paymentFailure/paymentUnreachable/loadGeneratorFloodHomepage/imageSlowLoad),直接在活环境里做了真实的最小验证(翻转flag+人工触发一次checkout/查Locust统计,不调用Claude API、不跑collect_trajectories.py):paymentFailure(payment日志出现Payment request failed真实抛错)、paymentUnreachable(checkout API返回500,同cartFailure的badhost模式)、loadGeneratorFloodHomepage(Locust /stats/requests显示GET /从2跃升到302且100%失败)三个确认真实有效;imageSlowLoad(浏览器侧图片加载延迟,直接curl验证方式不对,未能确认对后端诊断Agent是否可观测,标记待验证。验证完成后已用reset_all_flags()和stop_recommendation_leak_fixture()复位环境,不影响其它工作。); 4) 对44条 historical_reverse_derivation 种子逐条读 annotations.description 全文,手工比对_inject_historical_fault() 的关键词/service映射表,判断现有兜底逻辑会不会真的注入、注入是否与种子自带的叙事(部分种子的description本身就是'陈旧告警/证据不支持故障'的结论性文本)冲突; 5) 对 flagd_combination 的多flag组合种子,按'组合内最差的那个flag决定整体类别'规则汇总(任一flag已知不可观测则整条判B,任一flag未确认可观测则判C,全部已验证有效才判A)。",
+  "multi_flag_support_finding": "任务要求核查fault_injection.py能否同时设置多个flag、如果不能则补齐。实测结论:该能力已经存在且已被现有单测覆盖,不需要新增代码。证据:parse_flags()的正则\\bflags?=([\\w+]+)本身就支持'flags=a+b+c'按'+'切分成多个flag名(见 test_fault_injection.py::test_parse_flags_combination);activate_flags(config_path, flag_names)本身就是对传入的flag_names列表逐个设置defaultVariant,不是只处理单个flag(见 test_fault_injection.py::test_activate_flags_picks_most_severe_non_boolean_variant,用两个flag一起测过)。本次额外在真实flagd容器上跑了一遍三flag组合(productCatalogFailure+adHighCpu+cartFailure)验证inject_alert_fault一次性把三个都设置成on、reset_all_flags一次性全部复位成off,行为完全正确。因此没有对fault_injection.py做任何代码改动。",
+  "test_run": "cd data/cold_start/tests && python3 -m pytest -q -> 38 passed, 无新增/无回归。",
+  "counts": {
+    "A": 23,
+    "B": 45,
+    "C": 6
+  },
+  "recommended_real_collection_count": 23,
+  "recommended_real_collection_files": [
+    "seed_0001_parametrized_dependency.json",
+    "seed_0002_parametrized_dependency.json",
+    "seed_0003_parametrized_dependency.json",
+    "seed_0008_parametrized_dependency.json",
+    "seed_0010_parametrized_dependency.json",
+    "seed_0189_parametrized_resource.json",
+    "seed_0191_parametrized_resource.json",
+    "seed_0283_parametrized_deploy_regression.json",
+    "seed_0376_flagd_combination_resource.json",
+    "seed_0381_flagd_combination_resource.json",
+    "seed_0419_flagd_combination_resource.json",
+    "seed_0429_flagd_combination_resource.json",
+    "seed_0525_flagd_combination_resource.json",
+    "seed_0605_historical_reverse_derivation_resource.json",
+    "seed_0609_historical_reverse_derivation_deploy_regression.json",
+    "seed_0615_historical_reverse_derivation_dependency.json",
+    "seed_0617_historical_reverse_derivation_deploy_regression.json",
+    "seed_0630_historical_reverse_derivation_deploy_regression.json",
+    "seed_0655_historical_reverse_derivation_deploy_regression.json",
+    "seed_0663_historical_reverse_derivation_resource.json",
+    "seed_0664_historical_reverse_derivation_dependency.json",
+    "seed_0665_historical_reverse_derivation_dependency.json",
+    "seed_0666_historical_reverse_derivation_resource.json"
+  ],
+  "seeds": [
+    {
+      "file": "seed_0001_parametrized_dependency.json",
+      "service": "payment",
+      "generation_path": "parametrized",
+      "intended_kind": "dependency",
+      "category": "A",
+      "mechanism": "flag=paymentUnreachable",
+      "reason": "本次新验证有效: 设为on后checkout对payment的charge调用改连badAddress:50051,checkout API返回500(与cartFailure同款badhost模式)"
+    },
+    {
+      "file": "seed_0002_parametrized_dependency.json",
+      "service": "payment",
+      "generation_path": "parametrized",
+      "intended_kind": "dependency",
+      "category": "A",
+      "mechanism": "flag=paymentFailure",
+      "reason": "本次新验证有效: 设为100%后payment日志出现'Payment request failed. Invalid token...'真实抛错,前端checkout返回500"
+    },
+    {
+      "file": "seed_0003_parametrized_dependency.json",
+      "service": "cart",
+      "generation_path": "parametrized",
+      "intended_kind": "dependency",
+      "category": "A",
+      "mechanism": "flag=cartFailure",
+      "reason": "已验证有效(cart C# EmptyCart->badhost, docstring既有结论)"
+    },
+    {
+      "file": "seed_0004_parametrized_dependency.json",
+      "service": "recommendation",
+      "generation_path": "parametrized",
+      "intended_kind": "dependency",
+      "category": "B",
+      "mechanism": "flag=recommendationCacheFailure",
+      "reason": "已知recommendation服务Python客户端不响应flag(docstring既有结论)"
+    },
+    {
+      "file": "seed_0008_parametrized_dependency.json",
+      "service": "cart",
+      "generation_path": "parametrized",
+      "intended_kind": "dependency",
+      "category": "A",
+      "mechanism": "flag=cartFailure",
+      "reason": "已验证有效(cart C# EmptyCart->badhost, docstring既有结论)"
+    },
+    {
+      "file": "seed_0010_parametrized_dependency.json",
+      "service": "product-catalog",
+      "generation_path": "parametrized",
+      "intended_kind": "dependency",
+      "category": "A",
+      "mechanism": "flag=productCatalogFailure",
+      "reason": "已验证有效(product-catalog Go服务, docstring既有结论)"
+    },
+    {
+      "file": "seed_0012_parametrized_dependency.json",
+      "service": "ad",
+      "generation_path": "parametrized",
+      "intended_kind": "dependency",
+      "category": "B",
+      "mechanism": "flag=adFailure",
+      "reason": "同ad服务客户端bug,docstring记录adFailure交叉测试同样不可观测"
+    },
+    {
+      "file": "seed_0095_parametrized_resource.json",
+      "service": "ad",
+      "generation_path": "parametrized",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "resource_cpu tag -> adHighCpu(固定)",
+      "reason": "已知ad服务Java OpenFeature/gRPC客户端不响应flag(docstring既有结论)"
+    },
+    {
+      "file": "seed_0096_parametrized_resource.json",
+      "service": "ad",
+      "generation_path": "parametrized",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "resource_cpu tag -> adHighCpu(固定)",
+      "reason": "已知ad服务Java OpenFeature/gRPC客户端不响应flag(docstring既有结论)"
+    },
+    {
+      "file": "seed_0189_parametrized_resource.json",
+      "service": "kafka",
+      "generation_path": "parametrized",
+      "intended_kind": "resource",
+      "category": "A",
+      "mechanism": "queue_backlog tag -> kafkaQueueProblems(固定)",
+      "reason": "已验证有效(checkout生产端+fraud-detection消费端日志, docstring既有结论)"
+    },
+    {
+      "file": "seed_0191_parametrized_resource.json",
+      "service": "kafka",
+      "generation_path": "parametrized",
+      "intended_kind": "resource",
+      "category": "A",
+      "mechanism": "queue_backlog tag -> kafkaQueueProblems(固定)",
+      "reason": "已验证有效(checkout生产端+fraud-detection消费端日志, docstring既有结论)"
+    },
+    {
+      "file": "seed_0283_parametrized_deploy_regression.json",
+      "service": "recommendation",
+      "generation_path": "parametrized",
+      "intended_kind": "deploy_regression",
+      "category": "A",
+      "mechanism": "deploy_regression tag -> start_recommendation_leak_fixture()",
+      "reason": "fixture真实可用(list-append内存单调爬升,docstring既有实测)。但该种子scenario_hint声称'泄漏机制=未关闭的文件句柄(unclosed_file_handle)',而现有fixture只实现了无界list.extend()这一种泄漏方式,不区分'文件句柄'变体——注入后能产生真实的内存泄漏症状,但底层代码级根因叙事和种子期望的不完全一致,供任务#16盲标GT时留意。"
+    },
+    {
+      "file": "seed_0376_flagd_combination_resource.json",
+      "service": "frontend",
+      "generation_path": "flagd_combination",
+      "intended_kind": "resource",
+      "category": "A",
+      "mechanism": "flags=loadGeneratorFloodHomepage(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合内所有flag均已验证真实有效: ['loadGeneratorFloodHomepage']"
+    },
+    {
+      "file": "seed_0377_flagd_combination_dependency.json",
+      "service": "ad",
+      "generation_path": "flagd_combination",
+      "intended_kind": "dependency",
+      "category": "B",
+      "mechanism": "flags=adFailure(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合里包含已知不可观测的flag: ['adFailure'](即使其余flag真实生效,组合期望的复合故障签名也不完整)"
+    },
+    {
+      "file": "seed_0378_flagd_combination_dependency.json",
+      "service": "recommendation",
+      "generation_path": "flagd_combination",
+      "intended_kind": "dependency",
+      "category": "B",
+      "mechanism": "flags=recommendationCacheFailure(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合里包含已知不可观测的flag: ['recommendationCacheFailure'](即使其余flag真实生效,组合期望的复合故障签名也不完整)"
+    },
+    {
+      "file": "seed_0379_flagd_combination_resource.json",
+      "service": "ad",
+      "generation_path": "flagd_combination",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "flags=adManualGc(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合里包含已知不可观测的flag: ['adManualGc'](即使其余flag真实生效,组合期望的复合故障签名也不完整)"
+    },
+    {
+      "file": "seed_0381_flagd_combination_resource.json",
+      "service": "kafka",
+      "generation_path": "flagd_combination",
+      "intended_kind": "resource",
+      "category": "A",
+      "mechanism": "flags=kafkaQueueProblems+paymentUnreachable(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合内所有flag均已验证真实有效: ['kafkaQueueProblems', 'paymentUnreachable']"
+    },
+    {
+      "file": "seed_0382_flagd_combination_resource.json",
+      "service": "product-catalog",
+      "generation_path": "flagd_combination",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "flags=productCatalogFailure+adHighCpu+cartFailure(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合里包含已知不可观测的flag: ['adHighCpu'](即使其余flag真实生效,组合期望的复合故障签名也不完整)"
+    },
+    {
+      "file": "seed_0384_flagd_combination_dependency.json",
+      "service": "recommendation",
+      "generation_path": "flagd_combination",
+      "intended_kind": "dependency",
+      "category": "B",
+      "mechanism": "flags=recommendationCacheFailure+cartFailure+paymentUnreachable(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合里包含已知不可观测的flag: ['recommendationCacheFailure'](即使其余flag真实生效,组合期望的复合故障签名也不完整)"
+    },
+    {
+      "file": "seed_0385_flagd_combination_resource.json",
+      "service": "recommendation",
+      "generation_path": "flagd_combination",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "flags=recommendationCacheFailure+kafkaQueueProblems+imageSlowLoad(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合里包含已知不可观测的flag: ['recommendationCacheFailure'](即使其余flag真实生效,组合期望的复合故障签名也不完整)"
+    },
+    {
+      "file": "seed_0388_flagd_combination_resource.json",
+      "service": "ad",
+      "generation_path": "flagd_combination",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "flags=adHighCpu+paymentFailure+imageSlowLoad(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合里包含已知不可观测的flag: ['adHighCpu'](即使其余flag真实生效,组合期望的复合故障签名也不完整)"
+    },
+    {
+      "file": "seed_0395_flagd_combination_resource.json",
+      "service": "ad",
+      "generation_path": "flagd_combination",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "flags=adFailure+loadGeneratorFloodHomepage(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合里包含已知不可观测的flag: ['adFailure'](即使其余flag真实生效,组合期望的复合故障签名也不完整)"
+    },
+    {
+      "file": "seed_0416_flagd_combination_resource.json",
+      "service": "ad",
+      "generation_path": "flagd_combination",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "flags=adManualGc+adHighCpu(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合里包含已知不可观测的flag: ['adManualGc', 'adHighCpu'](即使其余flag真实生效,组合期望的复合故障签名也不完整)"
+    },
+    {
+      "file": "seed_0419_flagd_combination_resource.json",
+      "service": "product-catalog",
+      "generation_path": "flagd_combination",
+      "intended_kind": "resource",
+      "category": "A",
+      "mechanism": "flags=productCatalogFailure+loadGeneratorFloodHomepage(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合内所有flag均已验证真实有效: ['productCatalogFailure', 'loadGeneratorFloodHomepage']"
+    },
+    {
+      "file": "seed_0429_flagd_combination_resource.json",
+      "service": "kafka",
+      "generation_path": "flagd_combination",
+      "intended_kind": "resource",
+      "category": "A",
+      "mechanism": "flags=kafkaQueueProblems+cartFailure(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合内所有flag均已验证真实有效: ['kafkaQueueProblems', 'cartFailure']"
+    },
+    {
+      "file": "seed_0430_flagd_combination_dependency.json",
+      "service": "cart",
+      "generation_path": "flagd_combination",
+      "intended_kind": "dependency",
+      "category": "C",
+      "mechanism": "flags=cartFailure+imageSlowLoad(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合里包含未确认可观测性的flag: ['imageSlowLoad'],其余flag(['cartFailure'])已验证有效,但复合信号完整性待验证"
+    },
+    {
+      "file": "seed_0431_flagd_combination_resource.json",
+      "service": "ad",
+      "generation_path": "flagd_combination",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "flags=adManualGc+adHighCpu+kafkaQueueProblems(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合里包含已知不可观测的flag: ['adManualGc', 'adHighCpu'](即使其余flag真实生效,组合期望的复合故障签名也不完整)"
+    },
+    {
+      "file": "seed_0449_flagd_combination_resource.json",
+      "service": "recommendation",
+      "generation_path": "flagd_combination",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "flags=kafkaQueueProblems+recommendationCacheFailure(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合里包含已知不可观测的flag: ['recommendationCacheFailure'](即使其余flag真实生效,组合期望的复合故障签名也不完整)"
+    },
+    {
+      "file": "seed_0482_flagd_combination_resource.json",
+      "service": "ad",
+      "generation_path": "flagd_combination",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "flags=adHighCpu+adManualGc(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合里包含已知不可观测的flag: ['adHighCpu', 'adManualGc'](即使其余flag真实生效,组合期望的复合故障签名也不完整)"
+    },
+    {
+      "file": "seed_0525_flagd_combination_resource.json",
+      "service": "product-catalog",
+      "generation_path": "flagd_combination",
+      "intended_kind": "resource",
+      "category": "A",
+      "mechanism": "flags=productCatalogFailure+kafkaQueueProblems(多flag同时注入,已用fault_injection.activate_flags实测可同时setDefaultVariant)",
+      "reason": "组合内所有flag均已验证真实有效: ['productCatalogFailure', 'kafkaQueueProblems']"
+    },
+    {
+      "file": "seed_0585_historical_reverse_derivation_resource.json",
+      "service": "kafka",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "C",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "关键词兜底会匹配'消费'->kafkaQueueProblems(真实有效),但种子文案自称'当前环境docker ps里没有任何kafka相关容器'——这与当前AIops-agent环境实际情况矛盾(kafka/fraud-detection/accounting现在确实在跑)。若真的注入,会产生与种子预设叙事(陈旧/无效告警)相反的真实积压信号,GT该怎么定需要任务#16定夺,先标C。"
+    },
+    {
+      "file": "seed_0587_historical_reverse_derivation_resource.json",
+      "service": "kafka",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "C",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "同0585,关键词匹配kafkaQueueProblems(真实有效),但种子文案本身论证'低流量下即使flag on也无实际积压',暗示这条种子的预期GT就是'证据不支持问题'。是否要真的注入、注入后是否会因为背景流量太低而依然复现'无积压'的叙事,需要采集时观察真实lag指标再定,标C。"
+    },
+    {
+      "file": "seed_0588_historical_reverse_derivation_resource.json",
+      "service": "shipping",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "shipping服务的CPU型故障(运费算法配置模式变更),没有对应flagd开关,_HIST_CPU_FLAGS只覆盖ad,shipping没有可用机制。"
+    },
+    {
+      "file": "seed_0591_historical_reverse_derivation_config.json",
+      "service": "currency",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "config",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "currency证书轮换,config类,无可行注入机制(排除范围内)。"
+    },
+    {
+      "file": "seed_0592_historical_reverse_derivation_dependency.json",
+      "service": "payment",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "dependency",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "payment依赖风控重试无退避,文案用'连接池'而非'线程池',关键词兜底本身就命不中；即使命中，_HIST_DEPENDENCY_FLAGS也没有payment这个key，无可用flag映射。"
+    },
+    {
+      "file": "seed_0593_historical_reverse_derivation_resource.json",
+      "service": "ad",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "ad服务CPU场景,文案本身也在论证'flagd/jvm指标均显示当前无负载,是陈旧告警',但即使想注入,adHighCpu对ad服务client本就不可观测,判B。"
+    },
+    {
+      "file": "seed_0594_historical_reverse_derivation_resource.json",
+      "service": "frontend",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "C",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "frontend首页流量暴增CPU型场景,文案关键词'CPU'会命中_HIST_CPU_KEYWORDS,但_HIST_CPU_FLAGS只映射了ad,frontend没有对应表项,现状是inject_alert_fault返回[]什么都不注入。本次新验证的loadGeneratorFloodHomepage机制其实完全匹配这条叙事(load-generator对frontend首页发起真实流量洪峰),只是fault_injection.py现有的历史工单关键词兜底路由没有把frontend CPU/流量场景接到这个flag上——这是一个真实存在的机制覆盖缺口,但按任务边界这次不改动关键词兜底逻辑(只被允许补多flag能力),先标C留给后续任务处理。"
+    },
+    {
+      "file": "seed_0595_historical_reverse_derivation_config.json",
+      "service": "quote",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "config",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "quote证书轮换,config类,无可行注入机制。"
+    },
+    {
+      "file": "seed_0597_historical_reverse_derivation_deploy_regression.json",
+      "service": "payment",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "deploy_regression",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "payment内存泄漏(重试列表未清理),_inject_historical_fault的内存分支只支持service==recommendation,payment没有对应fixture。"
+    },
+    {
+      "file": "seed_0598_historical_reverse_derivation_deploy_regression.json",
+      "service": "frontend",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "deploy_regression",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "frontend内存泄漏(缓存dict无TTL),同上,只有recommendation有fixture,frontend没有。"
+    },
+    {
+      "file": "seed_0600_historical_reverse_derivation_config.json",
+      "service": "shipping",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "config",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "shipping证书轮换,config类,无可行注入机制。"
+    },
+    {
+      "file": "seed_0601_historical_reverse_derivation_config.json",
+      "service": "recommendation",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "config",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "recommendation的A/B流量分配开关误配置(不是证书/CPU/内存/队列/超时关键词能命中的场景),关键词兜底全部不匹配,inject_alert_fault返回[],且没有专门机制模拟'A/B流量分配误配'这类应用层配置错误。"
+    },
+    {
+      "file": "seed_0602_historical_reverse_derivation_dependency.json",
+      "service": "product-catalog",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "dependency",
+      "category": "C",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "文案自称'当前沙箱环境未部署product-catalog容器',但当前AIops-agent环境product-catalog确实在跑；关键词兜底不会命中(无cert/内存/CPU/队列/超时关键词),所以现状是不注入、环境保持productCatalogFailure=off——这恰好和种子文案里'flag当前为off、只是复现告警文本'的说法一致,但种子文案关于'服务未部署'的另一半描述与实际环境矛盾，留给任务#16判断这条种子的GT到底该按'服务确实在跑、指标可查'的真实观测来写，还是保留原文案的'环境不匹配'结论。"
+    },
+    {
+      "file": "seed_0605_historical_reverse_derivation_resource.json",
+      "service": "recommendation",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "A",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "文案关键词含'内存'/'OOM',命中泄漏分支,service=recommendation -> start_recommendation_leak_fixture(),已验证可用。"
+    },
+    {
+      "file": "seed_0609_historical_reverse_derivation_deploy_regression.json",
+      "service": "recommendation",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "deploy_regression",
+      "category": "A",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "同上,recommendation内存泄漏,fixture有效。"
+    },
+    {
+      "file": "seed_0610_historical_reverse_derivation_dependency.json",
+      "service": "shipping",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "dependency",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "shipping依赖quote超时级联,关键词'超时'能命中,但_HIST_DEPENDENCY_FLAGS没有shipping这个key,无可用flag。"
+    },
+    {
+      "file": "seed_0611_historical_reverse_derivation_dependency.json",
+      "service": "recommendation",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "dependency",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "recommendation线程池被下游查询占满,关键词'线程池'命中,service=recommendation有映射但对应recommendationCacheFailure,该flag对recommendation client不可观测,判B。"
+    },
+    {
+      "file": "seed_0614_historical_reverse_derivation_config.json",
+      "service": "email",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "config",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "email证书轮换,config类,无可行注入机制。"
+    },
+    {
+      "file": "seed_0615_historical_reverse_derivation_dependency.json",
+      "service": "product-catalog",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "dependency",
+      "category": "A",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "product-catalog批量导入脚本占满线程池,关键词'线程池'命中,service在_HIST_DEPENDENCY_FLAGS映射到productCatalogFailure(已验证有效)。注意:productCatalogFailure实际效果是即时5xx报错,跟叙事里'慢查询占满线程池的渐进式级联超时'不是同一种故障签名,是通用代理故障,不是精确复现(与known_unsupported_seeds.json里seed_0595历史结论一致的已知限制,不改GT,如实标注)。"
+    },
+    {
+      "file": "seed_0617_historical_reverse_derivation_deploy_regression.json",
+      "service": "recommendation",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "deploy_regression",
+      "category": "A",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "recommendation内存泄漏,fixture有效,文案证据链很详细。"
+    },
+    {
+      "file": "seed_0618_historical_reverse_derivation_dependency.json",
+      "service": "checkout",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "dependency",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "checkout依赖shipping/quote级联超时,关键词'超时'/'线程池'能命中,但_HIST_DEPENDENCY_FLAGS没有checkout这个key。"
+    },
+    {
+      "file": "seed_0620_historical_reverse_derivation_deploy_regression.json",
+      "service": "email",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "deploy_regression",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "email内存泄漏(WeakSet未回收),只有recommendation有fixture,email没有。"
+    },
+    {
+      "file": "seed_0621_historical_reverse_derivation_resource.json",
+      "service": "currency",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "currency汇率缓存刷新间隔配置错误导致CPU飙高,是应用内部配置项,不是flagd开关,无可行注入机制。"
+    },
+    {
+      "file": "seed_0625_historical_reverse_derivation_resource.json",
+      "service": "recommendation",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "recommendation推理批大小配置调低导致CPU飙高,同样是应用内部配置项,不是flagd开关,无可行注入机制(且不属于内存泄漏叙事,不会走到recommendation fixture那个分支)。"
+    },
+    {
+      "file": "seed_0626_historical_reverse_derivation_resource.json",
+      "service": "ad",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "ad服务CPU场景,文案本身也判定'陈旧/失效告警',即使想注入adHighCpu对ad也不可观测,判B。"
+    },
+    {
+      "file": "seed_0629_historical_reverse_derivation_dependency.json",
+      "service": "ad",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "dependency",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "ad新增画像查询无超时导致协程堆积,关键词'超时'命中,但_HIST_DEPENDENCY_FLAGS没有ad这个key(即使有,ad服务flagd client本就不响应)。"
+    },
+    {
+      "file": "seed_0630_historical_reverse_derivation_deploy_regression.json",
+      "service": "recommendation",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "deploy_regression",
+      "category": "A",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "recommendation无界list泄漏,fixture有效。"
+    },
+    {
+      "file": "seed_0631_historical_reverse_derivation_dependency.json",
+      "service": "email",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "dependency",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "email发送协程堆积(SMTP网关慢,无超时),关键词'超时'命中,但_HIST_DEPENDENCY_FLAGS没有email这个key。"
+    },
+    {
+      "file": "seed_0633_historical_reverse_derivation_resource.json",
+      "service": "ad",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "ad运行时参数变更间接改变GC频率导致CPU飙高,是应用内部行为(不是flagd开关驱动),且落到ad服务即使有对应flag也不可观测,判B。"
+    },
+    {
+      "file": "seed_0635_historical_reverse_derivation_resource.json",
+      "service": "product-catalog",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "product-catalog模糊搜索功能开关误打开导致CPU飙高——这是应用自身的功能开关(不是flagd demo.flagd.json里的开关),没有对应真实注入机制。"
+    },
+    {
+      "file": "seed_0637_historical_reverse_derivation_resource.json",
+      "service": "ad",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "ad周期性GC停顿(区别于持续高CPU的另一种信号),同样落在ad服务且非flagd驱动,无可行机制,判B。"
+    },
+    {
+      "file": "seed_0639_historical_reverse_derivation_dependency.json",
+      "service": "currency",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "dependency",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "currency依赖外部汇率服务商无超时导致级联超时,关键词'超时'命中,但_HIST_DEPENDENCY_FLAGS没有currency这个key。"
+    },
+    {
+      "file": "seed_0641_historical_reverse_derivation_deploy_regression.json",
+      "service": "recommendation",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "deploy_regression",
+      "category": "C",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "**关键词误判风险**:文案实际结论是'CPU/内存/连接指标均正常,代码审查未发现排序bug,证据不支持任何缺陷(建议人工复核,不应贸然修复)'——本意是'一切正常,无故障'的reject型GT。但文案里出现了'内存'这个词(来自'CPU/内存/连接指标均正常'这句话),会被_inject_historical_fault的_HIST_LEAK_KEYWORDS子串匹配误命中,对service=recommendation触发start_recommendation_leak_fixture()——也就是说现有代码会给这条本该'什么故障都不存在'的种子意外注入一个真实的内存泄漏,直接与它自身的GT叙事矛盾。这是一个真实的关键词误判bug,但修复关键词匹配逻辑超出本次任务'只允许补多flag能力'的范围,标C并建议:采集这条种子前手动跳过inject_alert_fault调用(或在collect_trajectories.py里对这条seed_id做特殊排除),不要按默认流程走。"
+    },
+    {
+      "file": "seed_0642_historical_reverse_derivation_resource.json",
+      "service": "ad",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "ad服务CPU飙高(流量驱动,建议扩容),关键词'CPU'命中->adHighCpu,ad服务不可观测,判B。"
+    },
+    {
+      "file": "seed_0643_historical_reverse_derivation_resource.json",
+      "service": "cart",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "cart会话合并逻辑触发频率配置变更导致CPU飙高,是应用内部配置项,不是flagd开关,_HIST_CPU_FLAGS也没有cart这个key,无可行机制。"
+    },
+    {
+      "file": "seed_0649_historical_reverse_derivation_dependency.json",
+      "service": "quote",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "dependency",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "quote调用运费计算gRPC依赖无超时导致级联超时,关键词'超时'命中,但_HIST_DEPENDENCY_FLAGS没有quote这个key。"
+    },
+    {
+      "file": "seed_0653_historical_reverse_derivation_resource.json",
+      "service": "frontend",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "frontend运行时参数变更改变内部缓存清理频率导致CPU飙高——这是GC/缓存配置类叙事,不是流量驱动,跟loadGeneratorFloodHomepage(制造流量洪峰)语义不匹配,_HIST_CPU_FLAGS也没有frontend这个key,判B。"
+    },
+    {
+      "file": "seed_0655_historical_reverse_derivation_deploy_regression.json",
+      "service": "recommendation",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "deploy_regression",
+      "category": "A",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "recommendation全局缓存字典无TTL导致OOM,关键词'内存'(缓存)+recommendation,fixture有效。"
+    },
+    {
+      "file": "seed_0658_historical_reverse_derivation_config.json",
+      "service": "checkout",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "config",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "checkout证书轮换,config类,无可行注入机制。"
+    },
+    {
+      "file": "seed_0660_historical_reverse_derivation_deploy_regression.json",
+      "service": "checkout",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "deploy_regression",
+      "category": "B",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "checkout会话级缓存字典无TTL导致内存吃满,只有recommendation有fixture,checkout没有。"
+    },
+    {
+      "file": "seed_0663_historical_reverse_derivation_resource.json",
+      "service": "kafka",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "A",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "kafka消费者副本数缩容导致consumer lag堆积,关键词'堆积'/'consumer'命中kafkaQueueProblems,已验证有效(机制细节是'过载生产端+延迟消费端'而不是'缩容副本数',属于通用代理故障,不是精确复现,但能产生真实可观测的队列积压信号)。"
+    },
+    {
+      "file": "seed_0664_historical_reverse_derivation_dependency.json",
+      "service": "product-catalog",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "dependency",
+      "category": "A",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "product-catalog批量导入脚本无超时占满线程池,关键词'超时'/'线程池'命中,映射到productCatalogFailure,已验证有效(同seed_0615,通用代理故障,信号真实但不完全精确复现叙事)。"
+    },
+    {
+      "file": "seed_0665_historical_reverse_derivation_dependency.json",
+      "service": "cart",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "dependency",
+      "category": "A",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "cart对账批处理脚本无超时占满线程池,关键词'线程池'命中,映射到cartFailure,已验证有效(同上,通用代理故障)。"
+    },
+    {
+      "file": "seed_0666_historical_reverse_derivation_resource.json",
+      "service": "kafka",
+      "generation_path": "historical_reverse_derivation",
+      "intended_kind": "resource",
+      "category": "A",
+      "mechanism": "见reason(关键词兜底/无匹配机制)",
+      "reason": "kafka通知消费者副本数缩容导致consumer lag堆积,关键词'堆积'/'consumer'命中kafkaQueueProblems,已验证有效。"
+    }
+  ]
+}

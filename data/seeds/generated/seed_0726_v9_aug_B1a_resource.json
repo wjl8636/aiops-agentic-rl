@@ -1,0 +1,15 @@
+{
+  "alertname": "AccountingConsumerLagGrowing",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "warning",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "orders topic 消费积压持续增长，kafka 队列吞吐疑似异常",
+    "description": "orders topic 的消费积压从 1 小时前开始持续增长且仍在上升，kafka 队列侧的消费吞吐明显跟不上生产速率（下游表现：财务对账连续跑出缺口、accounting 侧流水滞后 40+ 分钟）。kafka broker 自身无异常、消费者组也健康（无重启、无掉线），怀疑 kafka 队列消费链路被注入了处理延迟（kafkaQueueProblems 开关）。积压会持续拖垮下游时效，请定位 kafka 侧的消费链路问题。"
+  },
+  "startsAt": "2026-09-06T10:20:00Z",
+  "scenario_hint": "[v9增强/B1a_交叉验证] flags=kafkaQueueProblems：注入真实故障但观测信号降级（Prometheus lag 冻结/ad 机制不生效/后端不可观测），OFREP 是权威第一信源——验证「OFREP 查 flag → Prometheus 读数正常不据此否定 → 换第二信源交叉验证 → 收敛输出 kind/route/confidence，不执行白名单外操作」"
+}

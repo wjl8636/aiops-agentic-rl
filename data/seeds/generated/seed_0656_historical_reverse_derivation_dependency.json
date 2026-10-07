@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "历史工单反演：hist-2026-02-recommendation-precompute-timeout",
+    "description": "2026-02 的一次事故：recommendation 新增了一个离线预计算任务，任务发起的下游查询没有配超时，占满 recommendation 自身线程池，frontend 调用 recommendation 接口出现级联超时。"
+  },
+  "startsAt": "2026-07-22T13:15:00Z",
+  "scenario_hint": "[历史工单反演/static] source_ticket=hist-2026-02-recommendation-precompute-timeout：从手写历史工单摘要样例反向抽取的告警（Milvus 检索池不足时的静态兜底）"
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "email",
+  "labels": {
+    "service": "email",
+    "severity": "critical",
+    "job": "emailservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0021-email-dependency",
+    "description": "email 服务在一次促销活动期间批量发送确认邮件，发送调用走的 SMTP 中转网关没有配超时；中转网关在流量高峰期间响应显著变慢，email 服务的发送协程大量堆积，邮件确认接口整体超时。"
+  },
+  "startsAt": "2026-07-21T18:30:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0021-email-dependency：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

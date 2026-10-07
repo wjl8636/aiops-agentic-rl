@@ -1,0 +1,54 @@
+{
+  "generated_at": "2026-09-08T00:22:18+00:00",
+  "commit": "e3c45fd45c172545ff8643678735cfff58055297",
+  "sources": [
+    "reports/aiops-qwen3.5-9b_20260907/run_20260907T172316/multi_run_20260907T172316.jsonl",
+    "reports/aiops-qwen3.5-9b_20260907/run_20260907T183332/multi_run_20260907T183332.jsonl",
+    "reports/aiops-qwen3.5-9b_20260907/run_20260907T192607/multi_run_20260907T192607.jsonl",
+    "reports/aiops-qwen3.5-9b_20260907/run_20260907T211514/multi_run_20260907T211514.jsonl",
+    "reports/aiops-qwen3.5-9b_20260907/run_20260907T220409/multi_run_20260907T220409.jsonl",
+    "reports/aiops-qwen3.5-9b_20260907/run_20260907T222353/multi_run_20260907T222353.jsonl",
+    "reports/aiops-qwen3.5-9b_20260907/run_20260907T230254/multi_run_20260907T230254.jsonl",
+    "reports/aiops-qwen3.5-9b_20260907/run_20260907T231731/multi_run_20260907T231731.jsonl",
+    "reports/aiops-qwen3.5-9b_20260907/run_20260907T235832/multi_run_20260907T235832.jsonl"
+  ],
+  "rows": 21,
+  "scenarios_total": 9,
+  "runs_per_scenario_avg": 2.33,
+  "effectiveness": {
+    "service_accuracy": 0.5238,
+    "kind_accuracy": 0.7619,
+    "route_accuracy": 0.5238,
+    "fix_success_rate": 0.5,
+    "code_location_accuracy": 0.5,
+    "mttr_seconds_p50": 649.548,
+    "mttr_minutes_p50": 10.826,
+    "pr_submission_rate": 1.0
+  },
+  "denominators": {
+    "service_accuracy": 21,
+    "kind_accuracy": 21,
+    "route_accuracy": 21,
+    "fix_success_rate": 2,
+    "code_location_accuracy": 2,
+    "mttr_p50": 20,
+    "pr_submission_rate": 1
+  },
+  "per_scenario_runs": {
+    "s2": 3,
+    "s3": 3,
+    "s1": 3,
+    "s_lowconf": 3,
+    "s6_info": 3,
+    "s9_adv": 3,
+    "s5_dup": 1,
+    "s4": 1,
+    "s7_hybrid": 1
+  },
+  "baseline_reference": {
+    "human_mttr_minutes_low": 30,
+    "human_mttr_minutes_high": 60,
+    "source": "Google SRE Book / DORA Report 行业中位数",
+    "note": "引用行业公开均值做对照，非本项目内做过的人工对照实验。"
+  }
+}

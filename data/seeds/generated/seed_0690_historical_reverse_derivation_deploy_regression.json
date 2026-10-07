@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "checkout",
+  "labels": {
+    "service": "checkout",
+    "severity": "critical",
+    "job": "checkoutservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：hist-2026-04-checkout-session-cache-no-ttl",
+    "description": "2026-04 的一次事故：checkout 团队为减少重复计算加了一个会话级缓存字典，同样忘了配 TTL，随着不同用户会话不断进入，缓存体积单调增长，最终把 checkout 内存吃满触发重启。"
+  },
+  "startsAt": "2026-07-23T14:45:00Z",
+  "scenario_hint": "[历史工单反演/static] source_ticket=hist-2026-04-checkout-session-cache-no-ttl：从手写历史工单摘要样例反向抽取的告警（Milvus 检索池不足时的静态兜底）"
+}

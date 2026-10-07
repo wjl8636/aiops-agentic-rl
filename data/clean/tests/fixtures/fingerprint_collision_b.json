@@ -1,0 +1,15 @@
+{
+  "alertname": "HighCpuUsage",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "ad 服务 CPU 使用率再次飙升（复用 s2 告警指纹）",
+    "description": "验证幂等去重：与上一条 CPU 告警指纹相同（alertname|service|severity 一致），在真实系统里第二次触发会被 seen_recently() 直接跳过。"
+  },
+  "startsAt": "2026-06-20T10:35:00Z",
+  "scenario_hint": "复用指纹，验证幂等去重会压掉的重复项"
+}

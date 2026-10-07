@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "cart",
+  "labels": {
+    "service": "cart",
+    "severity": "critical",
+    "job": "cartservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：hist-2025-12-cart-cache-no-eviction",
+    "description": "2025-12 大促预热期间的一次事故：cart 团队为提升命中率加了一个全局购物车快照缓存，上线时没配淘汰策略，大促流量下缓存条目持续增长，服务内存逐步爬升直到被 OOMKilled。"
+  },
+  "startsAt": "2026-07-23T15:30:00Z",
+  "scenario_hint": "[历史工单反演/static] source_ticket=hist-2025-12-cart-cache-no-eviction：从手写历史工单摘要样例反向抽取的告警（Milvus 检索池不足时的静态兜底）"
+}

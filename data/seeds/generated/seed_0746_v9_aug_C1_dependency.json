@@ -1,0 +1,15 @@
+{
+  "alertname": "CatalogGetProductFailing",
+  "service": "product-catalog",
+  "labels": {
+    "service": "product-catalog",
+    "severity": "critical",
+    "job": "product-catalog"
+  },
+  "annotations": {
+    "summary": "product-catalog 对特定商品持续返回失败",
+    "description": "product-catalog 的 GetProduct 对部分商品持续返回失败（productCatalogFailure 开关被打开），商品详情页大面积报错，recommendation/frontend 链路同步受影响。容器健康、无发版记录。请定位确认后给出处置建议。"
+  },
+  "startsAt": "2026-09-04T13:05:00Z",
+  "scenario_hint": "[v9增强/C1_早收敛] flag=productCatalogFailure：单 flag、单服务、证据链清晰——验证「Skill → OFREP 查 flag → 1-2 步旁证 → 收敛，总步数 ≤8」的效率目标行为"
+}

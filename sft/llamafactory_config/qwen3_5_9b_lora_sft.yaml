@@ -1,0 +1,107 @@
+# AIOps 故障诊断处置 Agent · Cold Start SFT 训练配置
+#
+# 字段名均已实际核实存在（非凭训练记忆瞎写）：
+#   - examples/train_lora/qwen3_lora_sft.yaml / qwen3_lora_sft_ds3.yaml
+#   - src/llamafactory/hparams/finetuning_args.py（lora_rank/lora_alpha/lora_dropout/lora_target 等字段定义）
+#   - src/llamafactory/hparams/model_args.py（flash_attn/disable_gradient_checkpointing 字段定义）
+#   - src/llamafactory/extras/constants.py（AttentionFunction 枚举: auto/disabled/sdpa/fa2/fa3；
+#     以及确认 `qwen3_5` / `qwen3_5_nothink` 模板名在当前 LLaMA-Factory 主分支里已经存在）
+# 仍然未经验证的部分见对应字段旁的行内注释。
+
+### model ------------------------------------------------------------------
+# 这里必须填「视觉塔剥离」之后的 text-only checkpoint 目录（sft/load_text_only.py 的
+# --output-dir 产物的绝对路径），不是原始的 Qwen3.5-9B 多模态 checkpoint。
+# 当前值是真实训练机（AutoDL A800，aiops-gpu）上 load_text_only.py 的实际产物路径，
+# 2026-09-07 SFT 全流程已在该机器上用这个路径真实跑通；换机器时改成新机器的实际绝对路径。
+model_name_or_path: /root/autodl-tmp/models/qwen3.5-9b-text-only
+# Qwen3.5 是刚发布的新架构（Gated DeltaNet + Gated Attention 混合），发布初期大概率仍需要
+# trust_remote_code 才能加载自定义 modeling 代码。
+trust_remote_code: true
+
+### method -----------------------------------------------------------------
+stage: sft
+do_train: true
+finetuning_type: lora
+
+# LoRA 超参：r=16、alpha=32、target = q/k/v/o + gate/up/down
+lora_rank: 16
+lora_alpha: 32
+lora_dropout: 0.05
+# 已对照 transformers 源码核实（modular_qwen3_5.py，v5.15.1）：
+# Qwen3.5 每层是 full_attention 或 linear_attention 二选一（config.text_config.layer_types 决定），
+# 两种层用的子模块命名完全不同，且不冲突（标准层叫 o_proj，线性层叫 out_proj）：
+#   - full_attention 层（Qwen3_5Attention）：q_proj/k_proj/v_proj/o_proj —— 跟 Qwen2/Qwen3 标准命名一致
+#   - linear_attention 层（Qwen3_5GatedDeltaNet）：in_proj_qkv/in_proj_z/in_proj_b/in_proj_a/out_proj
+#     （均为 nn.Linear，可以被 LoRA 包裹；同层里的 conv1d 是 nn.Conv1d、A_log/dt_bias 是裸 nn.Parameter，
+#     LoRA 本身不作用于这两类，不需要也不能列进 lora_target）
+#   - MLP：gate_proj/up_proj/down_proj —— 跟 Qwen2/Qwen3 标准命名一致
+# 下面这行列全了两种层的 proj 名字，理论上覆盖了全部 32 层（不区分 full/linear，某层用不到的名字
+# LLaMA-Factory 会自动跳过）。仍然建议拿到真实 checkpoint 后用
+# `for n, _ in model.named_modules(): print(n)` 抽样核对几层，确认命名跟源码一致（版本可能有差异）；
+# 跑不通就退回 lora_target: all（更省事但精度稍低的 fallback）。
+lora_target: q_proj,k_proj,v_proj,o_proj,gate_proj,up_proj,down_proj,in_proj_qkv,in_proj_z,in_proj_b,in_proj_a,out_proj
+
+# 显存优化组合之一（关键显存优化组合：LoRA + gradient checkpointing + bf16 +
+# FlashAttention-2 + DeepSpeed ZeRO-2）。经济档（2x 4090 24GB）如果单卡训练显存仍然紧张，
+# 取消下面这行注释、并确保 examples/deepspeed/ds_z2_config.json 文件存在于 LLaMA-Factory 安装目录：
+# deepspeed: examples/deepspeed/ds_z2_config.json
+
+### dataset ------------------------------------------------------------------
+# 数据集名字必须跟 data/cold_start/dataset_info_snippet.json 里注册的 key 完全一致
+# （已读取该文件核实：key 是 "aiops_cold_start_prefix_split"，formatting 是 "sharegpt"）。
+# 这个 dataset_info_snippet.json 必须先被合并进 LLaMA-Factory 安装目录下的 data/dataset_info.json，
+# 这一步由 sft/train_sft.sh 负责，见该脚本注释。
+dataset: aiops_cold_start_prefix_split
+# 用 qwen3_5_nothink（已核实 LLaMA-Factory 主分支的 template.py 里确实注册了 qwen3_5 和
+# qwen3_5_nothink 两个模板名）。选 nothink 的原因：data/cold_start/aiops_cold_start_sft.mock.jsonl
+# 里 assistant 轮（function_call / gpt）都是直出 JSON（工具调用或 Diagnosis 结构体），没有
+# <think>...</think> 推理块，用 nothink 变体避免训练目标跟模板自带的思考包装不匹配。
+# 如果后续冷启数据改成显式推理链（比如把 RCA 推理过程也放进训练目标），需要改回 qwen3_5 模板。
+template: qwen3_5_nothink
+# Qwen3.5-9B 原生 262K 上下文。诊断轨迹里 prior-steps 叙述（渐进式前缀拆分
+# 展开后每条子样本都带完整的历史工具调用+观测拼接文本）比一般对话长，8192 留出充分冗余但
+# 远小于 262K 上限，训练效率和显存都可控；真实数据分布确认后可按 p99 长度调整。
+cutoff_len: 8192
+preprocessing_num_workers: 16
+dataloader_num_workers: 4
+
+### output ------------------------------------------------------------------
+output_dir: saves/aiops-diagnose-qwen3.5-9b/lora/sft
+logging_steps: 10
+save_steps: 100
+plot_loss: true
+overwrite_output_dir: false
+save_only_model: false
+report_to: none  # 可选: [none, wandb, tensorboard, swanlab, mlflow]
+
+### train -------------------------------------------------------------------
+# 冷启数据规模小（design doc §4.4：约 990 条前缀拆分子样本），batch size 保守，靠梯度累积
+# 撑等效 batch，兼容经济档单卡显存预算。
+per_device_train_batch_size: 1
+gradient_accumulation_steps: 8
+learning_rate: 1.0e-4
+num_train_epochs: 3.0
+lr_scheduler_type: cosine
+warmup_ratio: 0.1
+bf16: true  # design doc §5.1「关键显存优化组合」之一
+# disable_gradient_checkpointing 的默认值就是 false（即梯度检查点默认启用），这里显式写出来
+# 避免歧义——design doc §5.1 明确要求 gradient checkpointing 是显存优化组合的一部分。
+disable_gradient_checkpointing: false
+# flash_attn 取值来自 LLaMA-Factory `AttentionFunction` 枚举: auto/disabled/sdpa/fa2/fa3。
+# design doc §5.1 原本要求 FlashAttention-2（"fa2"），但真实训练机上的实测结论是改用
+# "sdpa"：标准注意力层走 PyTorch 自带 SDPA、Gated DeltaNet 线性注意力层走
+# flash-linear-attention 的 Triton kernel（fla==0.5.2 需要 Triton>=3.8，与 fa2 的
+# 编译链约束冲突），详见 docs/训练踩坑记录.md §3.5"最终跑通的稳定组合"——
+# 2026-09-07 的 SFT 就是用 sdpa 跑通的。
+flash_attn: sdpa
+ddp_timeout: 180000000
+resume_from_checkpoint: null
+
+### eval ----------------------------------------------------------------
+# design doc §6 的 held-out/OOD/回归集是独立评测脚本跑的（不在本 SFT 训练配置范围内），
+# 这里保留一个可选的训练内验证集开关，默认注释掉。
+# eval_dataset: aiops_cold_start_prefix_split
+# val_size: 0.1
+# per_device_eval_batch_size: 1
+# eval_strategy: steps
+# eval_steps: 100

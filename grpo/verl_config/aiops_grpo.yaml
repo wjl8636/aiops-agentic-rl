@@ -1,0 +1,188 @@
+# AIOps 诊断 Agent GRPO 训练配置
+# ============================================================================
+# 校验状态（本会话没有安装 veRL、没有 GPU，全部离线核对）:
+#   - 字段名前标 [VERIFIED]  : 字段名和默认值经真实源码/配置文件核实存在。
+#   - 字段名前标 [ASSUMED]   : 字段名本身未直接核实到，是按 veRL 命名习惯或
+#     设计文档要求推断的，需要有 veRL 环境的人再核实。
+#   - 数值前标 [JUDGMENT]   : 字段名是 [VERIFIED] 的，但数值是设计文档没给出
+#     精确数字、需要工程判断的（只给了方向，例如"小幅扣分"）。
+#
+# 2026-09-07 补充：reward 段（custom_reward_function 的加载链路/逐样本调用
+# 签名/指向的适配层）已在训练机上的真实源码上逐行复核（该段内标注了具体文件
+# +行号），不再只是离线核对；其余段落的 [VERIFIED] 仍是离线口径。
+#
+# 这份 YAML 是"人可读的规范表"，字段名/嵌套结构对齐真实 veRL 的
+# verl/trainer/config/ 下各分文件的真实 schema。它是否能被
+# `python3 -m verl.trainer.main_ppo --config-path=... --config-name=aiops_grpo`
+# 直接原样加载，取决于 veRL 真实的 Hydra `defaults:` 组合机制的细节
+# ——这一点本会话【没有】验证（没装 veRL，无法实跑 Hydra 组合），已在
+# grpo/train_grpo.sh 里改用已被验证过的、更保险的 CLI dotted-override 调用方式。
+
+# ---------------------------------------------------------------------------
+# algorithm: GRPO advantage estimator + KL 约束
+# ---------------------------------------------------------------------------
+algorithm:
+  # [VERIFIED] 真实字段名+取值，核实自 examples/grpo_trainer/run_qwen3_8b_fsdp.sh
+  # 里的 `algorithm.adv_estimator=grpo`。
+  adv_estimator: grpo
+  # [VERIFIED] verl/trainer/config/ppo_trainer.yaml 默认值，GRPO 场景下的真实
+  # 惯用值（用组内 std 归一化 advantage，是 GRPO 相对 PPO 的核心区别之一）。
+  norm_adv_by_std_in_grpo: true
+  # [VERIFIED] 核实自 run_qwen3_8b_fsdp.sh：GRPO 用 actor.use_kl_loss（loss 项
+  # 里的 KL），而不是把 KL 塞进 reward 里，所以这里关掉 use_kl_in_reward。
+  # 对应本项目 doc §5.1/§5.4 的"对 SFT 之后的分布做 KL 惩罚"——实际落地在下面
+  # actor_rollout_ref.actor.use_kl_loss/kl_loss_coef，不在这个 reward 函数里
+  # （grpo/reward_router.py 的模块docstring 里也显式说明了这一点边界）。
+  use_kl_in_reward: false
+
+# ---------------------------------------------------------------------------
+# actor_rollout_ref: 底座模型 + LoRA + rollout 参数 + reference（KL 基准）
+# ---------------------------------------------------------------------------
+actor_rollout_ref:
+  model:
+    # [ASSUMED] 路径按 doc §5.1 底座选型填写；真实值取决于训练机器上的实际
+    # checkpoint 存放位置，需要在租卡机器上按 docs/复现指南.md 改写。
+    path: /path/to/Qwen3.5-9B-text-only  # doc §5.1: Qwen3_5ForCausalLM，去视觉塔的 text-only re-save 版本
+    # [VERIFIED] 长上下文/Agent 场景常用优化项，字段名核实自
+    # examples/grpo_trainer/run_qwen3_8b_fsdp.sh 的 MODEL 覆盖块。
+    use_remove_padding: true
+    enable_gradient_checkpointing: true
+    # --- LoRA（doc §5.1: r=16, alpha=32, target = q/k/v/o + gate/up/down）---
+    # [VERIFIED] 字段名（lora_rank/lora_alpha/target_modules/use_shm）核实自
+    # docs/advance/ppo_lora.rst 的 FSDP 后端示例（该文档示例用的是 lora_rank=32/
+    # alpha=32/target_modules=all-linear，数值不是我们的，字段名是真的）。
+    lora_rank: 16
+    lora_alpha: 32
+    # [ASSUMED] veRL 是否支持逐模块名列表格式在本会话未核实，如果真实跑不通请退回 "all-linear"。
+    # 模块名本身已核实（对照 transformers v5.15.1 官方源码 modular_qwen3_5.py）：Qwen3.5
+    # 每层是 full_attention（标准命名 q/k/v/o_proj）或 linear_attention/Gated DeltaNet
+    # （命名是 in_proj_qkv/in_proj_z/in_proj_b/in_proj_a/out_proj，跟标准命名不冲突）二选一，
+    # 下面列全两种层的 proj 名字（sft/llamafactory_config/qwen3_5_9b_lora_sft.yaml 同步过的
+    # 同一份列表）。
+    target_modules: [q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj, in_proj_qkv, in_proj_z, in_proj_b, in_proj_a, out_proj]
+    use_shm: true
+  actor:
+    # [VERIFIED] 字段名+默认值核实自 verl/trainer/config/actor/actor.yaml
+    # （注释原文："True for GRPO"）。
+    use_kl_loss: true
+    # [JUDGMENT] 数值是 verl 官方 GRPO 示例脚本的默认值（KL_LOSS_COEF:-0.001），
+    # doc 本身没给出精确系数，直接复用官方默认作为起点，训练时按 KL 实际漂移
+    # 幅度再调。
+    kl_loss_coef: 0.001
+    # [VERIFIED] 字段名+取值核实自 actor.yaml（可选: k1/abs/k2/k3/full/
+    # low_var_kl），示例脚本用的是 low_var_kl。
+    kl_loss_type: low_var_kl
+    optim:
+      lr: 1.0e-6  # [JUDGMENT] 沿用 veRL 示例默认 actor_lr，doc 未给出精确学习率
+  rollout:
+    # [VERIFIED] 字段名核实自 rollout.yaml 注释："number of responses (i.e.
+    # num sample times). > 1 for grpo" —— 这就是 doc §5.1 的 group_size。
+    n: 6  # doc §5.1: "每个 query 采 group size = 6 条独立轨迹"
+    # [VERIFIED] rollout.yaml 里真实存在的 multi_turn 配置块（enable/
+    # max_assistant_turns/max_user_turns/tool_config_path/function_tool_path/
+    # format/tokenization_sanity_check_mode 等字段名全部核实存在）。
+    multi_turn:
+      enable: true  # 注: rollout.yaml 注释里写"应同时把 rollout.name 设为 sglang"，
+                     # 见下面 name 字段的冲突说明
+      # [ASSUMED] doc 说的是"最长交互 12 轮"，veRL 真实字段是
+      # max_assistant_turns（assistant 侧的工具调用轮数上限，不是字面的
+      # "max_turns"）——按"每一轮 = 一次工具调用"的自然理解映射过去，
+      # 但没有在真实 veRL 环境里跑通验证这个映射的运行时语义是否完全等价于
+      # doc 描述的"12 轮工具调用"。硬截断+负奖的实现见 grpo/reward_router.py
+      # 的 max_turns_truncation_penalty（同一个数字 12，靠
+      # grpo/tests/test_verl_config.py 的 shape test 防止两处数字漂移）。
+      max_assistant_turns: 12
+      max_user_turns: 12
+      # [ASSUMED] 指向 verl_adapter/ 未来把 AIOps Agent 的工具面（Bash/Read/
+      # Grep/Glob + remediation.py 白名单 + PreToolUse hook）注册成 veRL
+      # BaseTool 子类的配置文件路径；该文件本身不在本任务范围内构建。
+      tool_config_path: verl_adapter/tool_config.yaml
+    # [ASSUMED，且已知与 rollout.yaml 官方注释冲突] doc §5.1 明确写"vLLM
+    # offload 到另一张卡"，但 rollout.yaml 里 multi_turn 配置块自己的注释是
+    # "设 True 时应同时把 rollout.name 设为 sglang"——即真实 veRL 里多轮工具
+    # 调用场景官方推荐用 sglang 而不是 vllm。这里按 doc 原文保留 vllm，
+    # 但这个冲突需要有 veRL 环境的人实测确认 vllm 后端能不能带 multi_turn
+    # 工具调用跑通，跑不通就要切 sglang。
+    name: vllm
+    tensor_model_parallel_size: 1  # [JUDGMENT] 经济档单卡 rollout，doc 未给出精确 TP size
+    gpu_memory_utilization: 0.6  # [VERIFIED] 字段名核实，数值抄自官方示例脚本默认
+
+  ref:
+    # [VERIFIED] 字段名核实自 examples/grpo_trainer/run_qwen3_8b_fsdp.sh 的
+    # REF 覆盖块。ref 模型即 SFT 冷启后的 checkpoint（algorithm.use_kl_in_reward
+    # =false 时，KL 是 policy 对这个 ref 算的，不是对 base 预训练模型算的）。
+    fsdp_config:
+      param_offload: true
+
+# ---------------------------------------------------------------------------
+# reward: 自定义 reward 函数入口 —— 逐样本适配层 grpo/verl_reward_adapter.py
+# ---------------------------------------------------------------------------
+reward:
+  # [VERIFIED] 字段名 path/name 核实自 verl/trainer/config/reward/reward.yaml
+  # 的 custom_reward_function 块（真实默认 name 是 "compute_score"）。
+  custom_reward_function:
+    # [VERIFIED 2026-09-07, 训练机 aiops-gpu:/root/autodl-tmp/code/verl] 真实
+    # 加载链路：verl/trainer/ppo/reward.py::get_custom_reward_fn ->
+    # verl/utils/import_utils.py::load_extern_object -> load_module，按【文件
+    # 路径】importlib.util.spec_from_file_location 加载（无包上下文、模块名是
+    # custom_module_<hash>），所以 grpo/verl_reward_adapter.py 顶部自己把仓库
+    # 根目录塞进 sys.path 之后才能 import reward/ 与 grpo/ 兄弟包。另注意
+    # path 是相对进程 CWD 解析的（load_module 里 os.path.exists 检查），
+    # train_grpo.sh 必须在仓库根目录下启动。
+    path: grpo/verl_reward_adapter.py
+    # [VERIFIED 2026-09-07, aiops-gpu] NaiveRewardManager.__call__ 的逐样本
+    # 关键字调用（verl/workers/reward_manager/naive.py L131-135）：
+    #   compute_score(data_source=..., solution_str=..., ground_truth=...,
+    #                 extra_info=...)
+    # 适配器从 solution_str（qwen3_xml 多轮文本）还原这条 rollout 的
+    # Trajectory，调 grpo.reward_router.compute_trajectory_reward 出分数；
+    # 组内方差由模块内 _GroupAccumulator 按 extra_info["index"] 攒够
+    # group_size 条后调 compute_group_rewards 计算。
+    # ***已知未验证假设***：该累加器假设同一进程会依次收到同一组的全部
+    # rollout——naive.py 的串行逐样本循环（L102）是这一假设的事实基础，但
+    # ray 是否会把一组的 reward batch 拆给多个 worker 未在真实 veRL 环境验证
+    # （与上文 multi_turn/vllm 冲突同级的待实测项），详见
+    # grpo/verl_reward_adapter.py 模块 docstring 的假设清单。
+    name: compute_score
+  reward_manager:
+    # [VERIFIED] 字段名+默认值核实自 reward.yaml。naive 的逐样本调用惯例已由
+    # grpo/verl_reward_adapter.py 适配好（含返回 float 的惯例）；是否还需要
+    # 自定义 reward_manager（例如想把组方差/逐项 breakdown 写进训练日志）
+    # 留待真实训练时按日志需求决定。
+    name: naive
+
+# ---------------------------------------------------------------------------
+# trainer: 日志/保存/GPU 拓扑
+# ---------------------------------------------------------------------------
+trainer:
+  # [VERIFIED] 字段名核实自 ppo_trainer.yaml / run_qwen3_8b_fsdp.sh。
+  project_name: aiops-diagnosis-grpo
+  experiment_name: qwen3_5_9b_lora_grpo
+  logger: ["console"]
+  # doc §5.1 经济档: 2x RTX 4090 24GB / 1x A100 40GB，rollout 和 policy update
+  # 分离在两张卡上（vLLM offload 到一张卡，另一张卡专心做 policy update）。
+  # 这是【硬件拓扑/infra 决策】，不是训练超参数，veRL 目前没有一个单一字段
+  # 能表达"这张卡专门做 rollout、那张卡专门做 policy update"这种精确分工
+  # ——hybrid_engine 模式下 rollout 和 actor 默认共享同一批 GPU 资源池，
+  # 真正的"两张卡各管一边"需要在 ray 的 resource pool 配置里手工切分
+  # placement group，这一层配置本会话没有核实真实字段名，所以这里只放
+  # 注释块，不写成会被误当作已验证配置项的功能字段：
+  #   经济档拓扑（仅注释，非功能字段）：
+  #     GPU 0: vLLM rollout worker（Qwen3.5-9B text-only 的 vLLM 推理，
+  #            gpu_memory_utilization=0.6，AIOps 轨迹长度远小于 262K 上限）
+  #     GPU 1: policy update（LoRA 反向传播 + optimizer state）
+  #     参考: docs/复现指南.md（本任务范围外）里应记录具体 ray placement
+  #     group / resource pool 写法，需要有 veRL 环境的人补全并验证。
+  n_gpus_per_node: 2  # [JUDGMENT] 经济档 2 卡；对应上面的注释块，不隐含 veRL
+                       # 自动按"卡0=rollout / 卡1=policy"切分
+  nnodes: 1
+  save_freq: 20  # [JUDGMENT] 沿用官方示例默认，doc 未给出精确 checkpoint 间隔
+  test_freq: 5   # [JUDGMENT] 同上；对应 doc §5.4"每个 checkpoint 从 held-out
+                 # 抽 10 条走完整闭环"的定期抽检节奏，抽检脚本本身不在本任务
+                 # 范围内构建
+  total_epochs: 15  # [JUDGMENT] 沿用官方示例默认
+  # [2026-09-09 补充] 字段名+默认值核实自 verl/trainer/config/ppo_trainer.yaml
+  # （trainer.max_actor_ckpt_to_keep，默认 null=不限制）。数据盘只有90G，每个
+  # actor checkpoint ~17-18G，save_freq=20 若不限制保留数量，几次存盘就会把盘写满
+  # 导致训练中途因磁盘写满而中断。只保留最近2份（当前+上一份），足够回退。
+  max_actor_ckpt_to_keep: 2

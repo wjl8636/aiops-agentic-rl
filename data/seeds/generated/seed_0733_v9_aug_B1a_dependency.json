@@ -1,0 +1,15 @@
+{
+  "alertname": "AdServiceFailingRequests",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "critical",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "ad 服务对广告请求整体返回失败，首页广告位空白",
+    "description": "ad 服务对广告请求开始整体返回失败（adFailure 开关疑似被打开），首页广告位大面积空白，广告收入曲线快速下滑。ad 容器进程本身存活、无重启，常规资源指标正常，但请求失败是真实的，请交叉核实开关状态与调用链后给出处置结论。"
+  },
+  "startsAt": "2026-09-07T17:30:00Z",
+  "scenario_hint": "[v9增强/B1a_交叉验证] flags=adFailure：注入真实故障但观测信号降级（Prometheus lag 冻结/ad 机制不生效/后端不可观测），OFREP 是权威第一信源——验证「OFREP 查 flag → Prometheus 读数正常不据此否定 → 换第二信源交叉验证 → 收敛输出 kind/route/confidence，不执行白名单外操作」"
+}

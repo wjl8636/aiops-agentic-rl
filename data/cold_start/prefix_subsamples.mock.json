@@ -1,0 +1,937 @@
+[
+  {
+    "alert_id": "mock_dep_clean",
+    "alert": {
+      "alertname": "MockHighErrorRate",
+      "service": "product-catalog",
+      "labels": {
+        "service": "product-catalog",
+        "severity": "critical",
+        "job": "product-catalog"
+      },
+      "annotations": {
+        "summary": "product-catalog GetProduct 5xx 飙升",
+        "description": "flagd productCatalogFailure 开关翻转后，product-catalog 依赖调用失败率飙升，上游 recommendation/frontend 大量报错。"
+      },
+      "startsAt": "2026-06-20T10:00:00Z"
+    },
+    "step_index": 1,
+    "total_steps": 5,
+    "prefix_steps": [],
+    "target_type": "tool_call",
+    "target": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps"
+      }
+    }
+  },
+  {
+    "alert_id": "mock_dep_clean",
+    "alert": {
+      "alertname": "MockHighErrorRate",
+      "service": "product-catalog",
+      "labels": {
+        "service": "product-catalog",
+        "severity": "critical",
+        "job": "product-catalog"
+      },
+      "annotations": {
+        "summary": "product-catalog GetProduct 5xx 飙升",
+        "description": "flagd productCatalogFailure 开关翻转后，product-catalog 依赖调用失败率飙升，上游 recommendation/frontend 大量报错。"
+      },
+      "startsAt": "2026-06-20T10:00:00Z"
+    },
+    "step_index": 2,
+    "total_steps": 5,
+    "prefix_steps": [
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker ps"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "product-catalog   Up 2 hours (unhealthy)\nrecommendation    Up 3 hours",
+        "signal_types_covered": [
+          "kubectl_status"
+        ],
+        "is_repeat_no_new_info": false
+      }
+    ],
+    "target_type": "tool_call",
+    "target": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s http://localhost:9090/api/v1/query?query=up{job=\"product-catalog\"}"
+      }
+    }
+  },
+  {
+    "alert_id": "mock_dep_clean",
+    "alert": {
+      "alertname": "MockHighErrorRate",
+      "service": "product-catalog",
+      "labels": {
+        "service": "product-catalog",
+        "severity": "critical",
+        "job": "product-catalog"
+      },
+      "annotations": {
+        "summary": "product-catalog GetProduct 5xx 飙升",
+        "description": "flagd productCatalogFailure 开关翻转后，product-catalog 依赖调用失败率飙升，上游 recommendation/frontend 大量报错。"
+      },
+      "startsAt": "2026-06-20T10:00:00Z"
+    },
+    "step_index": 3,
+    "total_steps": 5,
+    "prefix_steps": [
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker ps"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "product-catalog   Up 2 hours (unhealthy)\nrecommendation    Up 3 hours",
+        "signal_types_covered": [
+          "kubectl_status"
+        ],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "curl -s http://localhost:9090/api/v1/query?query=up{job=\"product-catalog\"}"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "Prometheus: up{job=\"product-catalog\"} = 0，过去 5 分钟内错误率从 1% 跳升到 62%。",
+        "signal_types_covered": [
+          "prometheus"
+        ],
+        "is_repeat_no_new_info": false
+      }
+    ],
+    "target_type": "tool_call",
+    "target": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s http://localhost:16686/api/traces?service=product-catalog&limit=5"
+      }
+    }
+  },
+  {
+    "alert_id": "mock_dep_clean",
+    "alert": {
+      "alertname": "MockHighErrorRate",
+      "service": "product-catalog",
+      "labels": {
+        "service": "product-catalog",
+        "severity": "critical",
+        "job": "product-catalog"
+      },
+      "annotations": {
+        "summary": "product-catalog GetProduct 5xx 飙升",
+        "description": "flagd productCatalogFailure 开关翻转后，product-catalog 依赖调用失败率飙升，上游 recommendation/frontend 大量报错。"
+      },
+      "startsAt": "2026-06-20T10:00:00Z"
+    },
+    "step_index": 4,
+    "total_steps": 5,
+    "prefix_steps": [
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker ps"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "product-catalog   Up 2 hours (unhealthy)\nrecommendation    Up 3 hours",
+        "signal_types_covered": [
+          "kubectl_status"
+        ],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "curl -s http://localhost:9090/api/v1/query?query=up{job=\"product-catalog\"}"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "Prometheus: up{job=\"product-catalog\"} = 0，过去 5 分钟内错误率从 1% 跳升到 62%。",
+        "signal_types_covered": [
+          "prometheus"
+        ],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "curl -s http://localhost:16686/api/traces?service=product-catalog&limit=5"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "Jaeger: 最近 5 条 trace 全部在 GetProduct span 返回 UNAVAILABLE，下游未再往前传播，故障止在 product-catalog 自身。",
+        "signal_types_covered": [
+          "jaeger"
+        ],
+        "is_repeat_no_new_info": false
+      }
+    ],
+    "target_type": "tool_call",
+    "target": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs --tail 50 product-catalog"
+      }
+    }
+  },
+  {
+    "alert_id": "mock_dep_clean",
+    "alert": {
+      "alertname": "MockHighErrorRate",
+      "service": "product-catalog",
+      "labels": {
+        "service": "product-catalog",
+        "severity": "critical",
+        "job": "product-catalog"
+      },
+      "annotations": {
+        "summary": "product-catalog GetProduct 5xx 飙升",
+        "description": "flagd productCatalogFailure 开关翻转后，product-catalog 依赖调用失败率飙升，上游 recommendation/frontend 大量报错。"
+      },
+      "startsAt": "2026-06-20T10:00:00Z"
+    },
+    "step_index": 5,
+    "total_steps": 5,
+    "prefix_steps": [
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker ps"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "product-catalog   Up 2 hours (unhealthy)\nrecommendation    Up 3 hours",
+        "signal_types_covered": [
+          "kubectl_status"
+        ],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "curl -s http://localhost:9090/api/v1/query?query=up{job=\"product-catalog\"}"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "Prometheus: up{job=\"product-catalog\"} = 0，过去 5 分钟内错误率从 1% 跳升到 62%。",
+        "signal_types_covered": [
+          "prometheus"
+        ],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "curl -s http://localhost:16686/api/traces?service=product-catalog&limit=5"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "Jaeger: 最近 5 条 trace 全部在 GetProduct span 返回 UNAVAILABLE，下游未再往前传播，故障止在 product-catalog 自身。",
+        "signal_types_covered": [
+          "jaeger"
+        ],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker logs --tail 50 product-catalog"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "ERROR flagd: feature flag 'productCatalogFailure' evaluated to true, injecting synthetic 5xx",
+        "signal_types_covered": [
+          "logs"
+        ],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker restart product-catalog"
+        },
+        "hook_decision": "deny",
+        "hook_action": "restart_instance",
+        "hook_target": "product-catalog",
+        "observation": "PreToolUse hook 拒绝执行：低风险操作 restart_instance 命中，但目标 product-catalog 不在可自动处置白名单内，需改发飞书卡片交人工重启。",
+        "signal_types_covered": [],
+        "is_repeat_no_new_info": false
+      }
+    ],
+    "target_type": "diagnosis",
+    "target": {
+      "summary": "flagd productCatalogFailure 开关注入的合成依赖故障，需重启 product-catalog 清除注入状态。",
+      "kind": "dependency",
+      "suspect_service": "product-catalog",
+      "suspect_repo": null,
+      "suspect_commit_hint": null,
+      "suspect_file_hint": null,
+      "remediation_type": "online_op",
+      "remediation_detail": "建议重启 product-catalog 清除注入状态；product-catalog 不在自动处置白名单内，已改发飞书卡片交人工执行。",
+      "confidence": 0.88,
+      "evidence": [
+        "Prometheus up{job=\"product-catalog\"}=0，错误率从 1% 跳升到 62%",
+        "Jaeger 最近 5 条 trace 全部在 GetProduct span 返回 UNAVAILABLE",
+        "docker logs 显示 flagd productCatalogFailure 开关命中，注入合成 5xx"
+      ],
+      "time_window": null,
+      "also_code_fix": false,
+      "executed_actions": []
+    }
+  },
+  {
+    "alert_id": "mock_fail_evidence",
+    "alert": {
+      "alertname": "MockFabricatedEvidence",
+      "service": "checkout",
+      "labels": {
+        "service": "checkout",
+        "severity": "critical",
+        "job": "checkout"
+      },
+      "annotations": {
+        "summary": "checkout 错误率上升",
+        "description": "checkout 服务错误率上升。"
+      },
+      "startsAt": "2026-06-20T13:00:00Z"
+    },
+    "step_index": 1,
+    "total_steps": 1,
+    "prefix_steps": [
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker ps"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "checkout   Up 1 hour (healthy)",
+        "signal_types_covered": [
+          "kubectl_status"
+        ],
+        "is_repeat_no_new_info": false
+      }
+    ],
+    "target_type": "diagnosis",
+    "target": {
+      "summary": "checkout 数据库连接池耗尽。",
+      "kind": "resource",
+      "suspect_service": "checkout",
+      "suspect_repo": null,
+      "suspect_commit_hint": null,
+      "suspect_file_hint": null,
+      "remediation_type": "online_op",
+      "remediation_detail": "已重启 checkout。",
+      "confidence": 0.7,
+      "evidence": [
+        "kubectl top 显示 checkout 数据库连接池占用 100%，触发连接超时"
+      ],
+      "time_window": null,
+      "also_code_fix": false,
+      "executed_actions": []
+    }
+  },
+  {
+    "alert_id": "mock_fail_mismatch",
+    "alert": {
+      "alertname": "MockMismatchedConclusion",
+      "service": "currency",
+      "labels": {
+        "service": "currency",
+        "severity": "warning",
+        "job": "currency"
+      },
+      "annotations": {
+        "summary": "currency 延迟上升",
+        "description": "currency 服务延迟上升。"
+      },
+      "startsAt": "2026-06-20T14:00:00Z"
+    },
+    "step_index": 1,
+    "total_steps": 1,
+    "prefix_steps": [
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker stats --no-stream currency"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "currency   CPU% 97.0",
+        "signal_types_covered": [
+          "kubectl_status"
+        ],
+        "is_repeat_no_new_info": false
+      }
+    ],
+    "target_type": "diagnosis",
+    "target": {
+      "summary": "currency 服务判定为 info_only，无需处置。",
+      "kind": "resource",
+      "suspect_service": "payment",
+      "suspect_repo": null,
+      "suspect_commit_hint": null,
+      "suspect_file_hint": null,
+      "remediation_type": "info_only",
+      "remediation_detail": "无需处置。",
+      "confidence": 0.75,
+      "evidence": [
+        "docker stats 显示 currency CPU% 97.0"
+      ],
+      "time_window": null,
+      "also_code_fix": false,
+      "executed_actions": []
+    }
+  },
+  {
+    "alert_id": "mock_hookdeny_res",
+    "alert": {
+      "alertname": "MockAdCpuThrottled",
+      "service": "ad",
+      "labels": {
+        "service": "ad",
+        "severity": "warning",
+        "job": "ad"
+      },
+      "annotations": {
+        "summary": "ad 服务 CPU 打满，p99 延迟飙升",
+        "description": "ad 服务容器 CPU throttling 持续 100%，AdRequest p99 从 80ms 涨到 1.2s。"
+      },
+      "startsAt": "2026-06-20T11:00:00Z"
+    },
+    "step_index": 1,
+    "total_steps": 4,
+    "prefix_steps": [],
+    "target_type": "tool_call",
+    "target": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker stats --no-stream ad"
+      }
+    }
+  },
+  {
+    "alert_id": "mock_hookdeny_res",
+    "alert": {
+      "alertname": "MockAdCpuThrottled",
+      "service": "ad",
+      "labels": {
+        "service": "ad",
+        "severity": "warning",
+        "job": "ad"
+      },
+      "annotations": {
+        "summary": "ad 服务 CPU 打满，p99 延迟飙升",
+        "description": "ad 服务容器 CPU throttling 持续 100%，AdRequest p99 从 80ms 涨到 1.2s。"
+      },
+      "startsAt": "2026-06-20T11:00:00Z"
+    },
+    "step_index": 2,
+    "total_steps": 4,
+    "prefix_steps": [
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker stats --no-stream ad"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "ad   CPU% 99.8   MEM 480MiB / 512MiB",
+        "signal_types_covered": [
+          "kubectl_status"
+        ],
+        "is_repeat_no_new_info": false
+      }
+    ],
+    "target_type": "tool_call",
+    "target": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s http://localhost:9090/api/v1/query?query=rate(container_cpu_usage_seconds_total{name=\"ad\"}[1m])"
+      }
+    }
+  },
+  {
+    "alert_id": "mock_hookdeny_res",
+    "alert": {
+      "alertname": "MockAdCpuThrottled",
+      "service": "ad",
+      "labels": {
+        "service": "ad",
+        "severity": "warning",
+        "job": "ad"
+      },
+      "annotations": {
+        "summary": "ad 服务 CPU 打满，p99 延迟飙升",
+        "description": "ad 服务容器 CPU throttling 持续 100%，AdRequest p99 从 80ms 涨到 1.2s。"
+      },
+      "startsAt": "2026-06-20T11:00:00Z"
+    },
+    "step_index": 3,
+    "total_steps": 4,
+    "prefix_steps": [
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker stats --no-stream ad"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "ad   CPU% 99.8   MEM 480MiB / 512MiB",
+        "signal_types_covered": [
+          "kubectl_status"
+        ],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "curl -s http://localhost:9090/api/v1/query?query=rate(container_cpu_usage_seconds_total{name=\"ad\"}[1m])"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "Prometheus: ad 容器 CPU throttling 比例过去 10 分钟持续 100%。",
+        "signal_types_covered": [
+          "prometheus"
+        ],
+        "is_repeat_no_new_info": false
+      }
+    ],
+    "target_type": "tool_call",
+    "target": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker exec -it ad top"
+      }
+    }
+  },
+  {
+    "alert_id": "mock_hookdeny_res",
+    "alert": {
+      "alertname": "MockAdCpuThrottled",
+      "service": "ad",
+      "labels": {
+        "service": "ad",
+        "severity": "warning",
+        "job": "ad"
+      },
+      "annotations": {
+        "summary": "ad 服务 CPU 打满，p99 延迟飙升",
+        "description": "ad 服务容器 CPU throttling 持续 100%，AdRequest p99 从 80ms 涨到 1.2s。"
+      },
+      "startsAt": "2026-06-20T11:00:00Z"
+    },
+    "step_index": 4,
+    "total_steps": 4,
+    "prefix_steps": [
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker stats --no-stream ad"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "ad   CPU% 99.8   MEM 480MiB / 512MiB",
+        "signal_types_covered": [
+          "kubectl_status"
+        ],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "curl -s http://localhost:9090/api/v1/query?query=rate(container_cpu_usage_seconds_total{name=\"ad\"}[1m])"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "Prometheus: ad 容器 CPU throttling 比例过去 10 分钟持续 100%。",
+        "signal_types_covered": [
+          "prometheus"
+        ],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker exec -it ad top"
+        },
+        "hook_decision": "deny",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "PreToolUse hook 拒绝执行：docker exec 属于进容器高风险操作，不在低风险白名单内。",
+        "signal_types_covered": [],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker update --cpus 2 --memory 1024m ad"
+        },
+        "hook_decision": "allow",
+        "hook_action": "scale_resources",
+        "hook_target": "ad",
+        "observation": "ad 容器资源上限已提升为 --cpus 2 --memory 1024m。",
+        "signal_types_covered": [],
+        "is_repeat_no_new_info": false
+      }
+    ],
+    "target_type": "diagnosis",
+    "target": {
+      "summary": "ad 服务 CPU 打满导致延迟飙升，抬高资源上限后恢复。",
+      "kind": "resource",
+      "suspect_service": "ad",
+      "suspect_repo": null,
+      "suspect_commit_hint": null,
+      "suspect_file_hint": null,
+      "remediation_type": "online_op",
+      "remediation_detail": "已临时抬高 ad 容器 CPU/内存上限缓解打满。",
+      "confidence": 0.82,
+      "evidence": [
+        "docker stats 显示 ad 容器 CPU% 99.8",
+        "Prometheus container_cpu_usage_seconds_total 显示 ad 持续 100% throttling"
+      ],
+      "time_window": null,
+      "also_code_fix": false,
+      "executed_actions": [
+        {
+          "action": "scale_resources",
+          "target": "ad",
+          "command": "docker update --cpus 2 --memory 1024m ad",
+          "ts": "2026-06-20T00:00:00Z"
+        }
+      ]
+    }
+  },
+  {
+    "alert_id": "mock_hybrid_leak",
+    "alert": {
+      "alertname": "MockRecommendationMemoryLeak",
+      "service": "recommendation",
+      "labels": {
+        "service": "recommendation",
+        "severity": "critical",
+        "job": "recommendation"
+      },
+      "annotations": {
+        "summary": "recommendation 内存单调上升且需先止血再改代码根治",
+        "description": "recommendation 容器内存持续上涨、OOMKilled 次数飙升，怀疑最近一次发版引入了无界缓存；业务要求先扩容/重启止血，再触发代码修复 Agent 提 PR 根治。"
+      },
+      "startsAt": "2026-06-20T12:00:00Z"
+    },
+    "step_index": 1,
+    "total_steps": 5,
+    "prefix_steps": [],
+    "target_type": "tool_call",
+    "target": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker stats --no-stream recommendation"
+      }
+    }
+  },
+  {
+    "alert_id": "mock_hybrid_leak",
+    "alert": {
+      "alertname": "MockRecommendationMemoryLeak",
+      "service": "recommendation",
+      "labels": {
+        "service": "recommendation",
+        "severity": "critical",
+        "job": "recommendation"
+      },
+      "annotations": {
+        "summary": "recommendation 内存单调上升且需先止血再改代码根治",
+        "description": "recommendation 容器内存持续上涨、OOMKilled 次数飙升，怀疑最近一次发版引入了无界缓存；业务要求先扩容/重启止血，再触发代码修复 Agent 提 PR 根治。"
+      },
+      "startsAt": "2026-06-20T12:00:00Z"
+    },
+    "step_index": 2,
+    "total_steps": 5,
+    "prefix_steps": [
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker stats --no-stream recommendation"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "recommendation   MEM 940MiB / 1024MiB（持续上涨）",
+        "signal_types_covered": [
+          "kubectl_status"
+        ],
+        "is_repeat_no_new_info": false
+      }
+    ],
+    "target_type": "tool_call",
+    "target": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git -C /repo/recommendation log --oneline -5"
+      }
+    }
+  },
+  {
+    "alert_id": "mock_hybrid_leak",
+    "alert": {
+      "alertname": "MockRecommendationMemoryLeak",
+      "service": "recommendation",
+      "labels": {
+        "service": "recommendation",
+        "severity": "critical",
+        "job": "recommendation"
+      },
+      "annotations": {
+        "summary": "recommendation 内存单调上升且需先止血再改代码根治",
+        "description": "recommendation 容器内存持续上涨、OOMKilled 次数飙升，怀疑最近一次发版引入了无界缓存；业务要求先扩容/重启止血，再触发代码修复 Agent 提 PR 根治。"
+      },
+      "startsAt": "2026-06-20T12:00:00Z"
+    },
+    "step_index": 3,
+    "total_steps": 5,
+    "prefix_steps": [
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker stats --no-stream recommendation"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "recommendation   MEM 940MiB / 1024MiB（持续上涨）",
+        "signal_types_covered": [
+          "kubectl_status"
+        ],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git -C /repo/recommendation log --oneline -5"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "abc1234 feat: cache popular items in-memory for latency\nd4e5f67 chore: bump grpc\n...",
+        "signal_types_covered": [],
+        "is_repeat_no_new_info": false
+      }
+    ],
+    "target_type": "tool_call",
+    "target": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "git -C /repo/recommendation show abc1234 --stat"
+      }
+    }
+  },
+  {
+    "alert_id": "mock_hybrid_leak",
+    "alert": {
+      "alertname": "MockRecommendationMemoryLeak",
+      "service": "recommendation",
+      "labels": {
+        "service": "recommendation",
+        "severity": "critical",
+        "job": "recommendation"
+      },
+      "annotations": {
+        "summary": "recommendation 内存单调上升且需先止血再改代码根治",
+        "description": "recommendation 容器内存持续上涨、OOMKilled 次数飙升，怀疑最近一次发版引入了无界缓存；业务要求先扩容/重启止血，再触发代码修复 Agent 提 PR 根治。"
+      },
+      "startsAt": "2026-06-20T12:00:00Z"
+    },
+    "step_index": 4,
+    "total_steps": 5,
+    "prefix_steps": [
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker stats --no-stream recommendation"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "recommendation   MEM 940MiB / 1024MiB（持续上涨）",
+        "signal_types_covered": [
+          "kubectl_status"
+        ],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git -C /repo/recommendation log --oneline -5"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "abc1234 feat: cache popular items in-memory for latency\nd4e5f67 chore: bump grpc\n...",
+        "signal_types_covered": [],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git -C /repo/recommendation show abc1234 --stat"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "abc1234 修改 src/recommendation_server.py：新增全局 dict `_POPULAR_CACHE`，无过期/无容量上限，每次请求都会写入新 key。",
+        "signal_types_covered": [],
+        "is_repeat_no_new_info": false
+      }
+    ],
+    "target_type": "tool_call",
+    "target": {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs --tail 30 recommendation"
+      }
+    }
+  },
+  {
+    "alert_id": "mock_hybrid_leak",
+    "alert": {
+      "alertname": "MockRecommendationMemoryLeak",
+      "service": "recommendation",
+      "labels": {
+        "service": "recommendation",
+        "severity": "critical",
+        "job": "recommendation"
+      },
+      "annotations": {
+        "summary": "recommendation 内存单调上升且需先止血再改代码根治",
+        "description": "recommendation 容器内存持续上涨、OOMKilled 次数飙升，怀疑最近一次发版引入了无界缓存；业务要求先扩容/重启止血，再触发代码修复 Agent 提 PR 根治。"
+      },
+      "startsAt": "2026-06-20T12:00:00Z"
+    },
+    "step_index": 5,
+    "total_steps": 5,
+    "prefix_steps": [
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker stats --no-stream recommendation"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "recommendation   MEM 940MiB / 1024MiB（持续上涨）",
+        "signal_types_covered": [
+          "kubectl_status"
+        ],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git -C /repo/recommendation log --oneline -5"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "abc1234 feat: cache popular items in-memory for latency\nd4e5f67 chore: bump grpc\n...",
+        "signal_types_covered": [],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "git -C /repo/recommendation show abc1234 --stat"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "abc1234 修改 src/recommendation_server.py：新增全局 dict `_POPULAR_CACHE`，无过期/无容量上限，每次请求都会写入新 key。",
+        "signal_types_covered": [],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker logs --tail 30 recommendation"
+        },
+        "hook_decision": "passthrough",
+        "hook_action": null,
+        "hook_target": null,
+        "observation": "OOMKilled 事件 x3（过去 1 小时），MemoryError: cannot allocate memory",
+        "signal_types_covered": [
+          "logs"
+        ],
+        "is_repeat_no_new_info": false
+      },
+      {
+        "tool_name": "Bash",
+        "tool_input": {
+          "command": "docker restart recommendation"
+        },
+        "hook_decision": "allow",
+        "hook_action": "restart_instance",
+        "hook_target": "recommendation",
+        "observation": "recommendation 已重启，内存回落到 120MiB。",
+        "signal_types_covered": [],
+        "is_repeat_no_new_info": false
+      }
+    ],
+    "target_type": "diagnosis",
+    "target": {
+      "summary": "commit abc1234 引入的无界内存缓存导致 OOM，已重启止血，需代码修复根治。",
+      "kind": "deploy_regression",
+      "suspect_service": "recommendation",
+      "suspect_repo": "recommendation",
+      "suspect_commit_hint": "abc1234",
+      "suspect_file_hint": "src/recommendation_server.py",
+      "remediation_type": "online_op",
+      "remediation_detail": "已滚动重启 recommendation 清空内存，同时需要修复 abc1234 引入的无界缓存。",
+      "confidence": 0.9,
+      "evidence": [
+        "docker stats 显示 recommendation 内存持续上涨至 940MiB/1024MiB",
+        "git show abc1234 显示新增无过期/无容量上限的全局 dict 缓存",
+        "docker logs 显示过去 1 小时 OOMKilled 事件 x3"
+      ],
+      "time_window": null,
+      "also_code_fix": true,
+      "executed_actions": [
+        {
+          "action": "restart_instance",
+          "target": "recommendation",
+          "command": "docker restart recommendation",
+          "ts": "2026-06-20T00:00:00Z"
+        }
+      ]
+    }
+  }
+]

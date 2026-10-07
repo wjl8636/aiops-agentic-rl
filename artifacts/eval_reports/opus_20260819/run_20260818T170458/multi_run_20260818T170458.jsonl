@@ -1,0 +1,1 @@
+{"scenario": "s4", "route": "auto_remediated_and_code_fix_pr", "service_ok": true, "kind_ok": true, "route_ok": true, "triggered_code_fix": true, "fix_verified": true, "changed_files_hit": true, "diag_latency_s": 124.156, "fix_latency_s": 160.779, "total_latency_s": 284.935, "pr_created": true, "run_index": 0, "ts": "2026-08-18T17:09:55+00:00"}

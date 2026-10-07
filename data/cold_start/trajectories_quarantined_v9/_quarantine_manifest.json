@@ -1,0 +1,138 @@
+{
+  "_purpose": "2026-09-08 旧数据治理（docs/数据增强方案.md §4.5 跨类卫生治理 / Phase A）的隔离区：存放从已验收池里淘汰/隔离的轨迹。不删除任何文件，只移动 + 记录原因，保证可追溯、可回滚（把文件移回原目录即可）。",
+  "_decided_by": "数据增强方案 Phase A 治理（kind-GT 回填 + 全量重验收 + 污染扫描 + 步修剪），逐条原因见下方 quarantined 列表，完整治理报告见 data/cold_start/_governance_report_v9.md。",
+  "_scan_scope": "污染扫描覆盖 data/cold_start/ 下全部 12 个 trajectories* 目录的 553 个轨迹 JSON（含子目录）；扫描模式：eval/expected.json、eval/multi_run、multi_run、reports/、alerts/s\\d+、测评场景名（s10_ranking/s11_dedupe/s12_race/s7_hybrid/s8_fix_fail/s9_adv/s_lowconf/s5_dup/s6_info）、expected.json 专有字段名（expect_route/suspect_service_contains/kind_any_of），命令与观测都查。",
+  "quarantined": [
+    {
+      "seed": "seed_0701_parametrized_deploy_regression",
+      "from": [
+        "trajectories_accepted_v5",
+        "trajectories_accepted_v6",
+        "trajectories_accepted_v8"
+      ],
+      "reason": "答案钥污染（docs/数据增强方案.md §2.3-1/§4.5-1）：教师采集时翻看了测评答案钥——第 13 步 find 命中 eval 相关文件并在观测里带出 expected.json/s10_ranking 字样；第 14 步 `cat eval/expected.json | grep -A 20 s10_ranking` 直接读答案钥（观测里能看到 ./alerts/s10_ranking.json、suspect_service_contains 等 expected.json 专有内容）；第 15/16 步继续读取 alerts/s10_ranking.json。这些步骤经 prefix_split 成了 4 条训练目标，教模型『找 expected.json』。三个已验收池里的副本字节级相同（md5 2d8d7df796…），整条隔离，不做修剪保留（其结论本身可能受答案钥影响）。",
+      "kind_reaccept": "通过（kind=deploy_regression 命中 expect_kind_any_of=[deploy_regression]）——被隔离纯因污染，不是因为 kind"
+    },
+    {
+      "seed": "seed_0282_parametrized_deploy_regression",
+      "from": [
+        "trajectories_accepted_v8"
+      ],
+      "reason": "kind 重验收淘汰：MemoryLeakOOM 场景（recommendation 内存泄漏，misused_weakset 叙事）轨迹 kind=resource，而 s4 同机制期望严格 deploy_regression（docs/数据增强方案.md §7.3 决策表「内存泄漏 fixture / MemoryLeakOOM 叙事 → deploy_regression」）。正是 §2.2-1 点名的错标模式（「MemoryLeakOOM 轨迹 kind 标成 resource」）。",
+      "kind_reaccept": "拒绝：kind 不在期望集合 got='resource' expect_any_of=['deploy_regression']"
+    },
+    {
+      "seed": "seed_0283_parametrized_deploy_regression",
+      "from": [
+        "trajectories_accepted_v8"
+      ],
+      "reason": "kind 重验收淘汰：同 seed_0282（MemoryLeakOOM，unclosed_file_handle 叙事，kind=resource ≠ deploy_regression）。",
+      "kind_reaccept": "拒绝：kind 不在期望集合 got='resource' expect_any_of=['deploy_regression']"
+    },
+    {
+      "seed": "seed_0596_historical_reverse_derivation_deploy_regression",
+      "from": [
+        "trajectories_accepted_v8"
+      ],
+      "reason": "kind 重验收淘汰：内存泄漏叙事（hist-2026-01-cache-no-ttl，全局缓存字典无 TTL → OOMKilled）轨迹 kind=resource，期望 deploy_regression（同 s4 口径）。与 0282/0283/0655 是同一错标家族（§2.2-1 点名的「MemoryLeakOOM 轨迹 kind 标成 resource（0282/0283/0655）」的第四例）。",
+      "kind_reaccept": "拒绝：kind 不在期望集合 got='resource' expect_any_of=['deploy_regression']"
+    },
+    {
+      "seed": "seed_0655_historical_reverse_derivation_deploy_regression",
+      "from": [
+        "trajectories_accepted_v8"
+      ],
+      "reason": "kind 重验收淘汰：内存泄漏叙事（hist-2026-01-cache-no-ttl，与 seed_0596 同一工单）轨迹 kind=resource，期望 deploy_regression。§2.2-1 点名的错标三例之一。",
+      "kind_reaccept": "拒绝：kind 不在期望集合 got='resource' expect_any_of=['deploy_regression']"
+    },
+    {
+      "seed": "seed_0381_flagd_combination_resource",
+      "from": [
+        "trajectories_accepted_v8"
+      ],
+      "reason": "kind 重验收淘汰：kafkaQueueProblems 组合（kafkaQueueProblems+paymentUnreachable，service=kafka）轨迹 kind=config，期望 resource（s3 同机制严格口径 + §7.3「kafkaQueueProblems/消费积压 → resource」）。诊断走的是 §3-③ 点名的「OFREP flag=on 即权威 → kind=config」过自信捷径，还包含 v8 唯一的 malformed StructuredOutput 步（第 9 步 __unparsedToolInput）。",
+      "kind_reaccept": "拒绝：kind 不在期望集合 got='config' expect_any_of=['resource']"
+    },
+    {
+      "seed": "seed_0429_flagd_combination_resource",
+      "from": [
+        "trajectories_accepted_v8"
+      ],
+      "reason": "kind 重验收淘汰：kafkaQueueProblems 组合（kafkaQueueProblems+cartFailure，service=kafka）轨迹 kind=config，期望 resource。§2.2-1 点名：「v8 里 kafkaQueueProblems 轨迹的 kind 全是 config（0381/0429），而 expected.json s3 严格要求 resource」。",
+      "kind_reaccept": "拒绝：kind 不在期望集合 got='config' expect_any_of=['resource']"
+    },
+    {
+      "seed": "seed_0495_flagd_combination_resource",
+      "from": [
+        "trajectories_accepted_v8"
+      ],
+      "reason": "kind 重验收淘汰：RecommendationDegradedByQueueAndCache（kafkaQueueProblems+recommendationCacheFailure，叙事自述「跨服务的复合资源型压力而非单点故障」）轨迹 kind=config，期望 resource。与 0381/0429 同属「kafka 队列类标成 config」错标家族（方案文档预测淘汰 3-6 条时点名的两类模式之一）。",
+      "kind_reaccept": "拒绝：kind 不在期望集合 got='config' expect_any_of=['resource']"
+    },
+    {
+      "seed": "seed_0703_parametrized_deploy_regression",
+      "from": [
+        "trajectories_accepted_v8"
+      ],
+      "reason": "kind 重验收淘汰：dedupe fixture 纯逻辑 bug（与 s11_dedupe 同实例——同一 fixture 文件、同一大小写归一化 bug，suspect_file_hint 正确命中 dedupe.py）轨迹 kind=config，期望 deploy_regression（s11 严格口径 + §7.3「纯逻辑 bug fixture（ranking/dedupe/race 型）→ deploy_regression」）。此错标正是 s11 kind_ok=False 的直接训练来源。注：方案文档 §7.1 曾按「纯 code_fix 剔除 0701 后继承 2 条」估算，实际 0703/0704 的 kind 均为 config、均须淘汰，该家族 v8 继承归零，由 Phase C D1-D3（8 条新种子）重建。",
+      "kind_reaccept": "拒绝：kind 不在期望集合 got='config' expect_any_of=['deploy_regression']"
+    },
+    {
+      "seed": "seed_0704_parametrized_deploy_regression",
+      "from": [
+        "trajectories_accepted_v8"
+      ],
+      "reason": "kind 重验收淘汰：ranking fixture 纯逻辑 bug（与 s10_ranking 同实例——同一 fixture、同一反向排序 bug，suspect_file_hint 正确命中 ranking.py）轨迹 kind=config，期望 deploy_regression（s10 严格口径）。s10 kind_ok=False 的直接训练来源。同上，v8 纯 code_fix 家族继承归零。",
+      "kind_reaccept": "拒绝：kind 不在期望集合 got='config' expect_any_of=['deploy_regression']"
+    },
+    {
+      "seed": "seed_0717_v9_aug_A1_dependency",
+      "from": [
+        "trajectories_v9_raw/round1 (Phase C 新采集，已入 governed 后移出)"
+      ],
+      "reason": "答案钥相邻污染（Phase C 污染终检抓获，处置对齐 seed_0701 先例）：第 9 步 cd AIops-agent 后的 grep 观测里带出 ./alerts/s1.json、./alerts/s2.json 的 scenario_hint 内容（s1=productCatalogFailure、s2=adHighCpu 的机制标注——答案相邻信息）；第 3 步 RAG 检索还命中一条提及 s10_ranking.json 的历史工单（Milvus 里累积的测评期工单）。虽然其最终结论（fraud-detection ResolveInt 解析报错）与这些内容无直接因果，按 0701 先例整条隔离不入 v9。"
+    }
+  ],
+  "known_contaminated_raw_copies_not_moved": [
+    {
+      "file": "trajectories/code_fix_retry/seed_0701_parametrized_deploy_regression.json",
+      "note": "与已隔离的 0701 字节级相同的原始采集副本；code_fix_retry 是原始采集归档目录（非已验收池、不进任何数据集），保留原位不移动，但任何后续轮次都不得再从这些归档里验收该轨迹（§6.3-5 污染终检会拦住）。"
+    },
+    {
+      "file": "trajectories/real_run_merged_v4/seed_0701_parametrized_deploy_regression.json",
+      "note": "同上。"
+    },
+    {
+      "file": "trajectories/real_run_merged_v5/seed_0701_parametrized_deploy_regression.json",
+      "note": "同上。"
+    },
+    {
+      "file": "trajectories/pilot_newtypes_v2/seed_0282_parametrized_deploy_regression.json",
+      "note": "本轮全局污染扫描的新发现（方案文档未记录）：该 pilot 轨迹第 17 步 `find … -iname expected.json`、第 18/19 步用 python 直接打开 eval/expected.json 并打印 d['s4']/d['s7_hybrid'] 等答案钥内容。该轨迹 meta.degraded=timeout、从未进任何已验收池（v8 的 0282 是另一次干净采集，无污染痕迹），属原始归档，保留原位不移动。Phase C 起任何复用 pilot_newtypes_v2 数据的操作都必须先过污染终检。"
+    }
+  ],
+  "false_positives_reviewed": [
+    {
+      "file": "trajectories/pilot_newtypes_v1/seed_0283_parametrized_deploy_regression.json",
+      "step": 7,
+      "note": "命中模式 reports/，人工复核为目录列表观测里的普通路径片段（find 列项目目录时的输出），非读取测评报告，判定非污染。"
+    }
+  ],
+  "restored_2026_09_08_v9_phase_c": [
+    {
+      "seed": "seed_0381_flagd_combination_resource",
+      "restored_to": "trajectories_governed_v9",
+      "reason": "2026-09-08 口径更新（用户拍板）：kafka 类故障的 kind 从严格 [resource] 放宽为 [resource, config]（对齐 s2 先例、消除口径不一致）。这 3 条轨迹当时仅因 kind=config 被拒（其余验收项全过），按新口径恢复：修剪后重跑完整 6+8 项验收全部 PASS，与其它基座轨迹同口径（prune_steps 修剪 + meta.pruning 记录）。"
+    },
+    {
+      "seed": "seed_0429_flagd_combination_resource",
+      "restored_to": "trajectories_governed_v9",
+      "reason": "2026-09-08 口径更新（用户拍板）：kafka 类故障的 kind 从严格 [resource] 放宽为 [resource, config]（对齐 s2 先例、消除口径不一致）。这 3 条轨迹当时仅因 kind=config 被拒（其余验收项全过），按新口径恢复：修剪后重跑完整 6+8 项验收全部 PASS，与其它基座轨迹同口径（prune_steps 修剪 + meta.pruning 记录）。"
+    },
+    {
+      "seed": "seed_0495_flagd_combination_resource",
+      "restored_to": "trajectories_governed_v9",
+      "reason": "2026-09-08 口径更新（用户拍板）：kafka 类故障的 kind 从严格 [resource] 放宽为 [resource, config]（对齐 s2 先例、消除口径不一致）。这 3 条轨迹当时仅因 kind=config 被拒（其余验收项全过），按新口径恢复：修剪后重跑完整 6+8 项验收全部 PASS，与其它基座轨迹同口径（prune_steps 修剪 + meta.pruning 记录）。"
+    }
+  ]
+}

@@ -1,0 +1,206 @@
+{
+  "alert": {
+    "alertname": "RecommendationCacheMiss",
+    "service": "recommendation",
+    "labels": {
+      "service": "recommendation",
+      "severity": "warning",
+      "job": "recommendation"
+    },
+    "annotations": {
+      "summary": "recommendation 缓存层失效，接口延迟明显上升",
+      "description": "recommendation 服务的缓存层失效（recommendationCacheFailure 开关被打开），缓存全部穿透到重算路径，/recommend 接口延迟明显上升。服务进程健康、CPU/内存正常，近期无发版。请定位确认后给出处置建议。"
+    },
+    "startsAt": "2026-09-04T15:20:00Z",
+    "scenario_hint": "[v9增强/C1_早收敛] flag=recommendationCacheFailure：单 flag、单服务、证据链清晰——验证「Skill → OFREP 查 flag → 1-2 步旁证 → 收敛，总步数 ≤8」的效率目标行为"
+  },
+  "alert_id": "seed_0747_v9_aug_C1_dependency",
+  "final_diagnosis": {
+    "summary": "recommendation 服务的功能开关 recommendationCacheFailure 被置为 true(flagd OFREP 实时值 variant=on/STATIC),缓存层被强制旁路,所有 /recommend(ListRecommendations) 请求穿透到重算路径,导致接口延迟明显上升(p95≈90ms)。服务进程健康(CPU 8.77%、内存 44/500MiB)、无发版、无下游依赖报错。根因为纯功能开关取值错误,止血方式为在 flagd 关闭该开关(config-plane 变更,不属于低风险 docker 白名单,未自动执行,交人工)。",
+    "kind": "config",
+    "suspect_service": "recommendation",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "online_op",
+    "remediation_detail": "建议(需人工执行,不属于低风险 docker 白名单,故未自动执行):在 flagd 配置中将 recommendationCacheFailure 由 on/true 改回 off/false(默认值),使缓存层恢复,穿透消失后 /recommend 延迟即回落。注意:docker restart/migrate/scale 均无法修复本问题——该开关由 flagd 外部下发(OFREP reason=STATIC),重启/迁移/扩容 recommendation 容器不会改变开关取值;且容器 CPU/内存本就正常,不需要扩容。因此本次未执行任何 docker 处置。改开关后可再次用 OFREP(curl POST /ofrep/v1/evaluate/flags/recommendationCacheFailure)确认 value 变为 false,并观察 ListRecommendations p95 回落验证。",
+    "confidence": 0.9,
+    "evidence": [
+      "flagd OFREP: curl -X POST http://localhost:8016/ofrep/v1/evaluate/flags/recommendationCacheFailure 返回 {\"value\":true,\"key\":\"recommendationCacheFailure\",\"reason\":\"STATIC\",\"variant\":\"on\"} —— 开关确处于打开态,与告警描述一致,为直接根因证据",
+      "docker stats(recommendation): CPU 8.77%、Mem 44.25MiB/500MiB —— 进程健康,排除 CPU/内存/资源耗尽类根因",
+      "docker ps: recommendation Up 6 hours —— 无重启、无 OOM,排除进程崩溃/内存泄漏",
+      "Prometheus histogram_quantile(0.95, ...duration_milliseconds_bucket{service_name=\"recommendation\",span_kind=SPAN_KIND_SERVER}): /oteldemo.RecommendationService/ListRecommendations ≈ 90.4ms,印证缓存旁路后重算路径延迟上升",
+      "Prometheus traces_span_metrics{status_code=STATUS_CODE_ERROR}: 仅 /flagd.evaluation.v2.Service/EventStream 的 CLIENT span,与缓存/推荐逻辑无关,排除下游依赖报错型根因",
+      "docker logs recommendation: 持续正常 Receive ListRecommendations 日志、无 error,符合缓存穿透重算(非崩溃/依赖失败)",
+      "未执行任何 docker 处置:止血手段为 flagd 关闭开关(config-plane),不在低风险 docker 白名单;且 restart/scale/migrate 无法改变 flagd 外部下发的 STATIC 开关值,故交人工"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "feishu_online_op",
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"recommendation 服务的功能开关 recommendationCacheFailure 被置为 true(flagd OFREP 实时值 variant=on/STATIC),缓存层被强制旁路,所有 /recommend(ListRecommendations) 请求穿透到重算路径,导致接口延迟明显上升(p95≈90ms)。服务进程健康(CPU 8.77%、内存 44/500MiB)、无发版、无下游依赖报错。根因为纯功能开关取值错误,止血方式为在 flagd 关闭该开关(config-plane 变更,不属于低风险 docker 白名单,未自动执行,交人工)。\",\"kind\":\"config\",\"suspect_service\":\"recommendation\",\"remediation_type\":\"online_op\",\"remediation_detail\":\"建议(需人工执行,不属于低风险 docker 白名单,故未自动执行):在 flagd 配置中将 recommendationCacheFailure 由 on/true 改回 off/false(默认值),使缓存层恢复,穿透消失后 /recommend 延迟即回落。注意:docker restart/migrate/scale 均无法修复本问题——该开关由 flagd 外部下发(OFREP reason=STATIC),重启/迁移/扩容 recommendation 容器不会改变开关取值;且容器 CPU/内存本就正常,不需要扩容。因此本次未执行任何 docker 处置。改开关后可再次用 OFREP(curl POST /ofrep/v1/evaluate/flags/recommendationCacheFailure)确认 value 变为 false,并观察 ListRecommendations p95 回落验证。\",\"confidence\":0.9,\"also_code_fix\":false,\"suspect_repo\":null,\"suspect_commit_hint\":null,\"suspect_file_hint\":null,\"evidence\":[\"flagd OFREP: curl -X POST http://localhost:8016/ofrep/v1/evaluate/flags/recommendationCacheFailure 返回 {\\\"value\\\":true,\\\"key\\\":\\\"recommendationCacheFailure\\\",\\\"reason\\\":\\\"STATIC\\\",\\\"variant\\\":\\\"on\\\"} —— 开关确处于打开态,与告警描述一致,为直接根因证据\",\"docker stats(recommendation): CPU 8.77%、Mem 44.25MiB/500MiB —— 进程健康,排除 CPU/内存/资源耗尽类根因\",\"docker ps: recommendation Up 6 hours —— 无重启、无 OOM,排除进程崩溃/内存泄漏\",\"Prometheus histogram_quantile(0.95, ...duration_milliseconds_bucket{service_name=\\\"recommendation\\\",span_kind=SPAN_KIND_SERVER}): /oteldemo.RecommendationService/ListRecommendations ≈ 90.4ms,印证缓存旁路后重算路径延迟上升\",\"Prometheus traces_span_metrics{status_code=STATUS_CODE_ERROR}: 仅 /flagd.evaluation.v2.Service/EventStream 的 CLIENT span,与缓存/推荐逻辑无关,排除下游依赖报错型根因\",\"docker logs recommendation: 持续正常 Receive ListRecommendations 日志、无 error,符合缓存穿透重算(非崩溃/依赖失败)\",\"未执行任何 docker 处置:止血手段为 flagd 关闭开关(config-plane),不在低风险 docker 白名单;且 restart/scale/migrate 无法改变 flagd 外部下发的 STATIC 开关值,故交人工\"]}",
+    "teacher_model": "claude-4.8-opus-google",
+    "usage": {
+      "input_tokens": 2721,
+      "output_tokens": 5050,
+      "cache_creation_input_tokens": 22108,
+      "cache_read_input_tokens": 142561
+    },
+    "cost_usd": 0.3493105,
+    "num_turns": 8,
+    "duration_ms": 85411,
+    "model_usage": {
+      "claude-4.8-opus-google": {
+        "inputTokens": 2721,
+        "outputTokens": 5050,
+        "cacheReadInputTokens": 142561,
+        "cacheCreationInputTokens": 22108,
+        "webSearchRequests": 0,
+        "costUSD": 0.3493105,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000,
+        "canonicalModel": "claude-4.8-opus-google",
+        "provider": "firstParty"
+      }
+    },
+    "pruning": {
+      "steps_before": 7,
+      "steps_after": 7,
+      "removed": [],
+      "restored_by_verification": []
+    }
+  },
+  "steps": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps --format '{{.Names}}\\t{{.Status}}' | grep -i recomm; echo \"---stats---\"; docker stats --no-stream --format '{{.Name}}\\t{{.CPUPerc}}\\t{{.MemUsage}}' | grep -i recomm",
+        "description": "Check recommendation container status and resource usage"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "recommendation\tUp 6 hours\n---stats---\nrecommendation\t8.77%\t44.25MiB / 500MiB",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/recommendationCacheFailure' -H 'Content-Type: application/json' -d '{}'",
+        "description": "Query flagd OFREP for recommendationCacheFailure flag value"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"value\":true,\"key\":\"recommendationCacheFailure\",\"reason\":\"STATIC\",\"variant\":\"on\",\"metadata\":{}}",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s --data-urlencode 'query={service_name=\"recommendation\"}' 'http://localhost:9090/api/v1/query' | head -c 2000",
+        "description": "Query Prometheus for recommendation service metrics"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"instance\":\"b958cf4b-b065-4438-b4dc-8740326215e9\",\"job\":\"opentelemetry-demo/recommendation\",\"le\":\"6\",\"service_instance_id\":\"b958cf4b-b065-4438-b4dc-8740326215e9\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788851310.676,\"26\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"instance\":\"db68c960-9ecc-4858-a8fd-99c34a4bc967\",\"job\":\"opentelemetry-demo/recommendation\",\"le\":\"1000\",\"service_instance_id\":\"db68c960-9ecc-4858-a8fd-99c34a4bc967\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788851310.676,\"57\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"instance\":\"d6cadd2a-7d73-4575-8746-b1d66fb94c56\",\"job\":\"opentelemetry-demo/recommendation\",\"le\":\"2000\",\"service_instance_id\":\"d6cadd2a-7d73-4575-8746-b1d66fb94c56\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788851310.676,\"84\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"instance\":\"1f04e325-19f0-43b3-965b-064554fd53d0\",\"job\":\"opentelemetry-demo/recommendation\",\"le\":\"6\",\"service_instance_id\":\"1f04e325-19f0-43b3-965b-064554fd53d0\",\"service_name\":\"recommendation\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"/flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788851310.676,\"7\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"instance\":\"2efaae34-4",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -g 'http://localhost:9090/api/v1/query' --data-urlencode 'query=histogram_quantile(0.95, sum by (le,span_name) (rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"recommendation\",span_kind=\"SPAN_KIND_SERVER\"}[10m])))' | head -c 1500",
+        "description": "Query p95 latency of recommendation server spans"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"span_name\":\"/oteldemo.RecommendationService/ListRecommendations\"},\"value\":[1788851319.755,\"90.4054054054053\"]}]}}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs recommendation --tail 40 2>&1 | tail -40",
+        "description": "Check recommendation recent logs"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "2026-09-08 07:08:18,537 INFO [main] [recommendation_server.py:47] [trace_id=d973a8ac0813c1d8221efc4f2791f31f span_id=7a55f2a776557fed resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['OLJCESPC7Z', 'L9ECAV7KIM', '0PUK6V6EV0', '9SIQT8TOJO', '66VCHSJNUP']\n2026-09-08 07:08:19,562 INFO [main] [recommendation_server.py:47] [trace_id=e5682a3217683b725712fcf97fd4a76c span_id=7695f140f6b54c41 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['0PUK6V6EV0', 'L9ECAV7KIM', '1YMWWN1N4O', '66VCHSJNUP', '6E92ZMYYFZ']\n2026-09-08 07:08:19,685 INFO [main] [recommendation_server.py:47] [trace_id=0a7b6903c9f98ca8f4e01dda50ca4c2a span_id=f4b8b31a722de92f resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['6E92ZMYYFZ', '66VCHSJNUP', '1YMWWN1N4O', 'L9ECAV7KIM', 'OLJCESPC7Z']\n2026-09-08 07:08:19,773 INFO [main] [recommendation_server.py:47] [trace_id=c288381cde486fd24ccfffca385fa6fc span_id=1aadb7d757f80a97 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['LS4PSXUNUM', '9SIQT8TOJO', 'OLJCESPC7Z', 'L9ECAV7KIM', '1YMWWN1N4O']\n2026-09-08 07:08:23,515 INFO [main] [recommendation_server.py:47] [trace_id=f6dbf0b6a185ea743e7cdeccfdf427a4 span_id=f1ce813aeabbc72d resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['2ZYFJ3GM2N', '66VCHSJNUP', '1YMWWN1N4O', 'L9ECAV7KIM', '0PUK6V6EV0']\n2026-09-08 07:08:23,641 INFO [main] [recommendation_server.py:47] [trace_id=34e2aaa4d5b65342997a12e348fc4a40 span_id=1f7a4270fdff92e1 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['OLJCESPC7Z', '1YMWWN1N4O', 'L9ECAV7KIM', '2ZYFJ3GM2N', '6E92ZMYYFZ']\n2026-09-08 07:08:23,820 INFO [main] [recommendation_server.py:47] [trace_id=280758396e22ec8037a23a985576fe66 span_id=53bb2b88adee10a0 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['HQTGWGPNH4', 'LS4PSXUNUM', '66VCHSJNUP', '1YMWWN1N4O', '2ZYFJ3GM2N']\n2026-09-08 07:08:24,376 INFO [main] [recommendation_server.py:47] [trace_id=3385907ada766a85a9680ccd560a9945 span_id=6f3ad62dddd7df93 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['66VCHSJNUP', 'L9ECAV7KIM', 'OLJCESPC7Z', '9SIQT8TOJO', 'HQTGWGPNH4']\n2026-09-08 07:08:24,440 INFO [main] [recommendation_server.py:47] [trace_id=c36aab49361d8a308cfee7370e87056b span_id=8be8bb7f1a441521 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['6E92ZMYYFZ', '9SIQT8TOJO', 'LS4PSXUNUM', '2ZYFJ3GM2N', 'L9ECAV7KIM']\n2026-09-08 07:08:24,473 INFO [main] [recommendation_server.py:47] [trace_id=a201b10a34d0295bbe555efe8e550ec5 span_id=0dc8ec41e5f5e2e5 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['6E92ZMYYFZ', '0PUK6V6EV0', 'HQTGWGPNH4', 'OLJCESPC7Z', '9SIQT8TOJO']\n2026-09-08 07:08:24,578 INFO [main] [recommendation_server.py:47] [trace_id=7ed4f59d99fd6ca44c754f050468dd6e span_id=cfca2e075b63ad37 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['9SIQT8TOJO', '2ZYFJ3GM2N', 'HQTGWGPNH4', 'LS4PSXUNUM', 'OLJCESPC7Z']\n2026-09-08 07:08:24,642 INFO [main] [recommendation_server.py:47] [trace_id=5f1b25fc60aea0b740d4aab396aa08a4 span_id=d29d275699ea6eb7 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['6E92ZMYYFZ', '1YMWWN1N4O', 'LS4PSXUNUM', '0PUK6V6EV0', '66VCHSJNUP']\n2026-09-08 07:08:24,674 INFO [main] [recommendation_server.py:47] [trace_id=df2a3cb0982425509766d04340ec4d6c span_id=1018b6adacb47c5a resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['1YMWWN1N4O', '66VCHSJNUP', '0PUK6V6EV0', '2ZYFJ3GM2N', 'LS4PSXUNUM']\n2026-09-08 07:08:27,825 INFO [main] [recommendation_server.py:47] [trace_id=a65966f7019fdb97f0a8b712de77b960 span_id=30edf3ad02d5dd65 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['LS4PSXUNUM', '1YMWWN1N4O', 'OLJCESPC7Z', '2ZYFJ3GM2N', 'L9ECAV7KIM']\n2026-09-08 07:08:27,890 INFO [main] [recommendation_server.py:47] [trace_id=d65d23100e02924a435fdd930b9d0913 span_id=174dfded55766a6c resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['OLJCESPC7Z', '9SIQT8TOJO', '0PUK6V6EV0', '6E92ZMYYFZ', 'L9ECAV7KIM']\n2026-09-08 07:08:27,944 INFO [main] [recommendation_server.py:47] [trace_id=a2b83b46559b60a0373e8b375d04c7c3 span_id=a4298c2a7210614f resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['9SIQT8TOJO', 'L9ECAV7KIM', '6E92ZMYYFZ', '66VCHSJNUP', 'HQTGWGPNH4']\n2026-09-08 07:08:28,586 INFO [main] [recommendation_server.py:47] [trace_id=10daab095ebc967daa27d528ab7e1bd7 span_id=f113ea1ff5667830 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['L9ECAV7KIM', '2ZYFJ3GM2N', '0PUK6V6EV0', '1YMWWN1N4O', 'OLJCESPC7Z']\n2026-09-08 07:08:28,634 INFO [main] [recommendation_server.py:47] [trace_id=4fe893d348209d4558c802c14ef0d68b span_id=7530c6b3fa6a0fc9 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['OLJCESPC7Z', '2ZYFJ3GM2N', 'HQTGWGPNH4', '9SIQT8TOJO', '0PUK6V6EV0']\n2026-09-08 07:08:28,726 INFO [main] [recommendation_server.py:47] [trace_id=52c98f60dfe00502e6420d0d1431f730 span_id=848d4ba03dc47017 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['HQTGWGPNH4', '2ZYFJ3GM2N', 'OLJCESPC7Z', '9SIQT8TOJO', '66VCHSJNUP']\n2026-09-08 07:08:29,195 INFO [main] [recommendation_server.py:47] [trace_id=65b55f01b68712a9ad0b72d1c581dbb4 span_id=d117f36bcfadcdd7 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['0PUK6V6EV0', 'OLJCESPC7Z', 'L9ECAV7KIM', '1YMWWN1N4O', '9SIQT8TOJO']\n2026-09-08 07:08:29,325 INFO [main] [recommendation_server.py:47] [trace_id=5b6364eace2a6fc872dbd30dfb98f372 span_id=42a2ec928685c232 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['0PUK6V6EV0', 'L9ECAV7KIM', '66VCHSJNUP', '2ZYFJ3GM2N', '6E92ZMYYFZ']\n2026-09-08 07:08:29,370 INFO [main] [recommendation_server.py:47] [trace_id=922f33cf5ee1cd072ff0cac80b758d12 span_id=40d9b6b3c6bfea98 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['66VCHSJNUP', '6E92ZMYYFZ', 'LS4PSXUNUM', '0PUK6V6EV0', 'HQTGWGPNH4']\n2026-09-08 07:08:31,774 INFO [main] [recommendation_server.py:47] [trace_id=46598f82ebb7b21c1555f9e4702f7610 span_id=40b767c439cbcb5c resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['1YMWWN1N4O', 'OLJCESPC7Z', '0PUK6V6EV0', '6E92ZMYYFZ', '9SIQT8TOJO']\n2026-09-08 07:08:32,121 INFO [main] [recommendation_server.py:47] [trace_id=13773c8c93ed739370bd61bd722cfd71 span_id=e9bc81ba437f3373 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['L9ECAV7KIM', '2ZYFJ3GM2N', '6E92ZMYYFZ', 'OLJCESPC7Z', '0PUK6V6EV0']\n2026-09-08 07:08:32,146 INFO [main] [recommendation_server.py:47] [trace_id=abe96fd46d146837b73a3a72c57a3aac span_id=fc6864c41ce8bb51 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['66VCHSJNUP', 'OLJCESPC7Z', '0PUK6V6EV0', 'LS4PSXUNUM', 'HQTGWGPNH4']\n2026-09-08 07:08:33,260 INFO [main] [recommendation_server.py:47] [trace_id=092691c0ec13df98f5555790ca17383e span_id=80bfa079cf876cc4 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['66VCHSJNUP', 'L9ECAV7KIM', '6E92ZMYYFZ', '2ZYFJ3GM2N', '9SIQT8TOJO']\n2026-09-08 07:08:33,367 INFO [main] [recommendation_server.py:47] [trace_id=962ee68c48c794f40eb8eb20e78c942f span_id=93ea7cf142b5a234 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['LS4PSXUNUM', '9SIQT8TOJO', 'HQTGWGPNH4', '6E92ZMYYFZ', '66VCHSJNUP']\n2026-09-08 07:08:33,377 INFO [main] [recommendation_server.py:47] [trace_id=49bc8f243ab75194af9af77a553b8ca8 span_id=f4e5d3fb19882844 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['OLJCESPC7Z', '66VCHSJNUP', 'L9ECAV7KIM', 'LS4PSXUNUM', '1YMWWN1N4O']\n2026-09-08 07:08:33,420 INFO [main] [recommendation_server.py:47] [trace_id=11ad679943d46aa75fc52d75b6cba849 span_id=1119893cd70cd53a resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['6E92ZMYYFZ', 'L9ECAV7KIM', '2ZYFJ3GM2N', 'LS4PSXUNUM', '1YMWWN1N4O']\n2026-09-08 07:08:33,552 INFO [main] [recommendation_server.py:47] [trace_id=f5878b02fdefc0571658a13d05551ecb span_id=af57bb1bfa7cf718 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['6E92ZMYYFZ', '0PUK6V6EV0', '1YMWWN1N4O', 'LS4PSXUNUM', 'L9ECAV7KIM']\n2026-09-08 07:08:33,625 INFO [main] [recommendation_server.py:47] [trace_id=50c061dbbe71377f9421b962660acab5 span_id=6487bf35f4cb04bb resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['9SIQT8TOJO', 'OLJCESPC7Z', 'HQTGWGPNH4', '66VCHSJNUP', '0PUK6V6EV0']\n2026-09-08 07:08:35,795 INFO [main] [recommendation_server.py:47] [trace_id=06d00ec9611ca0eb9e7dff8e9bc0d2bb span_id=e8a081d5bb2299f6 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['6E92ZMYYFZ', 'LS4PSXUNUM', '1YMWWN1N4O', '66VCHSJNUP', 'HQTGWGPNH4']\n2026-09-08 07:08:35,833 INFO [main] [recommendation_server.py:47] [trace_id=6a4482cbfe36ac303381bdf61fa4bf6e span_id=966474d025c213d0 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['LS4PSXUNUM', '9SIQT8TOJO', '1YMWWN1N4O', '66VCHSJNUP', '6E92ZMYYFZ']\n2026-09-08 07:08:35,852 INFO [main] [recommendation_server.py:47] [trace_id=08162c185fe8569edb75072c4fae3060 span_id=c326d5100e32d8cc resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['LS4PSXUNUM', 'OLJCESPC7Z', '1YMWWN1N4O', '6E92ZMYYFZ', '2ZYFJ3GM2N']\n2026-09-08 07:08:37,147 INFO [main] [recommendation_server.py:47] [trace_id=c4847e9b4cf13974d280960ac328a5a5 span_id=f0752c9e4071d9be resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['6E92ZMYYFZ', 'OLJCESPC7Z', '9SIQT8TOJO', 'L9ECAV7KIM', 'HQTGWGPNH4']\n2026-09-08 07:08:37,189 INFO [main] [recommendation_server.py:47] [trace_id=dc4318e1d21d9c9045cee4e798139b4c span_id=7bb8a6397f84c49f resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['9SIQT8TOJO', 'LS4PSXUNUM', '6E92ZMYYFZ', '1YMWWN1N4O', 'OLJCESPC7Z']\n2026-09-08 07:08:37,211 INFO [main] [recommendation_server.py:47] [trace_id=155430b4d514768ac1718f02f550390b span_id=92918c334ca728e7 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['2ZYFJ3GM2N', '1YMWWN1N4O', 'LS4PSXUNUM', '0PUK6V6EV0', 'OLJCESPC7Z']\n2026-09-08 07:08:37,229 INFO [main] [recommendation_server.py:47] [trace_id=c1fef103f3181221554aa7349f872dcc span_id=ab08347bfc472541 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['1YMWWN1N4O', '66VCHSJNUP', 'LS4PSXUNUM', '2ZYFJ3GM2N', '9SIQT8TOJO']\n2026-09-08 07:08:37,273 INFO [main] [recommendation_server.py:47] [trace_id=b36a4a33f88b487c354d71941c3c3471 span_id=572d93b5e15a9325 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['1YMWWN1N4O', '2ZYFJ3GM2N', 'OLJCESPC7Z', '0PUK6V6EV0', 'LS4PSXUNUM']\n2026-09-08 07:08:37,306 INFO [main] [recommendation_server.py:47] [trace_id=bb47ed7469f0301fdf2f5b8c0199b11b span_id=aa94207d6efe6426 resource.service.name=recommendation trace_sampled=True] - Receive ListRecommendations for product ids:['6E92ZMYYFZ', 'HQTGWGPNH4', 'OLJCESPC7Z', 'L9ECAV7KIM', 'LS4PSXUNUM']",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "mcp__aiops_rag__search_past_incidents",
+      "tool_input": {
+        "query": "recommendation 缓存层失效 功能开关 recommendationCacheFailure 缓存穿透 接口延迟上升",
+        "top_k": 3
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "检索到以下历史相似诊断工单（按相似度降序）：\n\n[1] 相似度=0.6411 | 服务=recommendation | 类型=deploy_regression | 当时走向=auto_remediated_and_code_fix_pr\n    根因摘要: recommendation 服务因发版引入的无界内存缓存导致内存单调上升、逼近 OOM。当前部署镜像 sha=f18f452（deploys.log 标记 LATEST_DEPLOY suspect，替换基线 ac26792），git diff 确认该 commit 把模块级 `_seen_product_ids` 由 `deque(maxlen=128)` 改为无界 `list[str]`，并在 get_recommendations() 中被 extend() 且从不裁剪，配合后台压测线程持续调用，工作集内存无上限增长直至触发容器内存上限(256MiB)。已执行低风险止血 docker restart，内存已回落；根治需回退该缓存的边界，否则复发。\n    处置: 已执行止血：`docker restart recommendation`。执行前 `docker stats` 显示 228.9MiB/256MiB(89.43%)，`docker inspect` 显示 RestartCount=19、OOMKilled=false（说明此前已多次被 OOMKilled 后自动重启，正逼近下一次触发）；执行后 `docker stats` 显示降至 10.54MiB/256MiB(4.12%)，`docker inspect` 显示 RestartCount=0、OOMKilled=false、StartedAt=2026-08-18T02:58:21Z，服务已恢复健康、内存回落到低位。此重启仅为临时止血，负载持续下内存会再次单调上升直至下次 OOM，需尽快合并代码修复。\n\n代码根因（需 code_fix 根治）：workspace/recommendation/recommendation_server.py:31 模块级 `_seen_product_ids: list[str] = []` 在 :44 `get_recommendations()` 每次调用被无界 `extend(input_product_ids)`、从不裁剪；对比基线 commit ac26792，该处原为 `collections.deque(maxlen=128)`（有界近期 id 缓存），f18f452 commit \"perf: track all seen product ids for analytics\" 将其改为无界 list，是本次泄漏的直接引入点。修复方式：改回 `deque(maxlen=N)` 或对 list 做定期裁剪，并需通过仓库自带的 test_memory_is_bounded 测试门禁后再发版，避免下次发版复发。\n[2] 相似度=0.6385 | 服务=recommendation | 类型=deploy_regression | 当时走向=feishu_online_op\n    根因摘要: recommendation 服务在最新发版 (image/sha=e482193，deploys.log 标记 LATEST_DEPLOY suspect，替换 baseline f8a6666) 后内存单调上升并反复 OOM/重启。根因是 recommendation_server.py 中模块级列表 _seen_product_ids 每次 get_recommendations 被无界 extend、从不裁剪，128MB 上限下工作集持续增长直至 OOMKilled。混合根因：可先回滚到 baseline f8a6666 止血，彻底修复需改代码为该缓存加界。\n    处置: 先止血（online_op）：将 recommendation 回滚到上一稳定镜像 baseline sha=f8a6666（deploys.log 记录 e482193 为可疑 LATEST_DEPLOY），立即缓解 OOM/重启循环。潜在代码隐患（后续需 code_fix）：scripts/fixtures/recommendation/recommendation_server.py:31 的模块级 _seen_product_ids: list 在 :44 每次请求被无界 extend、从不裁剪，为泄漏源；修复方式为对其加界（collections.deque(maxlen=N)）或直接移除该累积，并使 test_memory_is_bounded 通过后再发版。\n[3] 相似度=0.6384 | 服务=recommendation | 类型=resource | 当时走向=auto_remediated_and_code_fix_pr\n    根因摘要: recommendation 服务(镜像 recommendation:f18f452，deploys.log 标记 LATEST_DEPLOY suspect)存在无界内存缓存 _seen_product_ids(list 无上限 append)，在服务自身后台压测线程持续调用下 RSS 单调上升导致 OOMKilled/推荐接口503。已执行低风险止血 docker restart 恢复服务；根治需合并已准备好的代码修复(deque(maxlen=500)限界缓存)。\n    处置: 止血(已执行): `docker restart recommendation` — 执行前 `docker stats` 显示 20.48MiB/256MiB(8.00%)，执行后 `docker inspect` 确认 StartedAt=2026-08-17T16:21:57Z、RestartCount=0、OOMKilled=false，`docker stats` 显示降至 10.73MiB/256MiB(4.19%)，服务已恢复健康、内存回落。根治(代码修复，需走 PR 流程)：recommendation_server.py 中 get_recommendations() 对模块级 `_seen_product_ids: list[str] = []` 做无界 extend()，每次调用都追加、从不裁剪；配合模块自带的后台压测线程(_background_load，每条 payload 256 字节)，working set 会持续单调增长直至触发容器内存上限 OOMKilled。workspace/recommendation 仓库已存在修复分支 fix/bound-seen-product-ids-cache(commit 9a43491 \"fix: bound _seen_product_ids cache to stop unbounded memory growth\")，将其改为 `collections.deque(maxlen=500)` 即可将 working set 限界；需要代码修复 Agent 基于该分支的改动提交 PR 并跑通 test_memory_is_bounded 门禁后合并，避免下次发版/长期运行再次复现 OOM。\n\n注意：历史工单仅供参考，请结合当前实时观测证据独立判断，不要盲目照搬。",
+      "signal_types_covered": [
+        "logs",
+        "kubectl_status",
+        "git_history",
+        "rag_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "recommendation 服务的功能开关 recommendationCacheFailure 被置为 true(flagd OFREP 实时值 variant=on/STATIC),缓存层被强制旁路,所有 /recommend(ListRecommendations) 请求穿透到重算路径,导致接口延迟明显上升(p95≈90ms)。服务进程健康(CPU 8.77%、内存 44/500MiB)、无发版、无下游依赖报错。根因为纯功能开关取值错误,止血方式为在 flagd 关闭该开关(config-plane 变更,不属于低风险 docker 白名单,未自动执行,交人工)。",
+        "kind": "config",
+        "suspect_service": "recommendation",
+        "remediation_type": "online_op",
+        "remediation_detail": "建议(需人工执行,不属于低风险 docker 白名单,故未自动执行):在 flagd 配置中将 recommendationCacheFailure 由 on/true 改回 off/false(默认值),使缓存层恢复,穿透消失后 /recommend 延迟即回落。注意:docker restart/migrate/scale 均无法修复本问题——该开关由 flagd 外部下发(OFREP reason=STATIC),重启/迁移/扩容 recommendation 容器不会改变开关取值;且容器 CPU/内存本就正常,不需要扩容。因此本次未执行任何 docker 处置。改开关后可再次用 OFREP(curl POST /ofrep/v1/evaluate/flags/recommendationCacheFailure)确认 value 变为 false,并观察 ListRecommendations p95 回落验证。",
+        "confidence": 0.9,
+        "also_code_fix": false,
+        "suspect_repo": null,
+        "suspect_commit_hint": null,
+        "suspect_file_hint": null,
+        "evidence": [
+          "flagd OFREP: curl -X POST http://localhost:8016/ofrep/v1/evaluate/flags/recommendationCacheFailure 返回 {\"value\":true,\"key\":\"recommendationCacheFailure\",\"reason\":\"STATIC\",\"variant\":\"on\"} —— 开关确处于打开态,与告警描述一致,为直接根因证据",
+          "docker stats(recommendation): CPU 8.77%、Mem 44.25MiB/500MiB —— 进程健康,排除 CPU/内存/资源耗尽类根因",
+          "docker ps: recommendation Up 6 hours —— 无重启、无 OOM,排除进程崩溃/内存泄漏",
+          "Prometheus histogram_quantile(0.95, ...duration_milliseconds_bucket{service_name=\"recommendation\",span_kind=SPAN_KIND_SERVER}): /oteldemo.RecommendationService/ListRecommendations ≈ 90.4ms,印证缓存旁路后重算路径延迟上升",
+          "Prometheus traces_span_metrics{status_code=STATUS_CODE_ERROR}: 仅 /flagd.evaluation.v2.Service/EventStream 的 CLIENT span,与缓存/推荐逻辑无关,排除下游依赖报错型根因",
+          "docker logs recommendation: 持续正常 Receive ListRecommendations 日志、无 error,符合缓存穿透重算(非崩溃/依赖失败)",
+          "未执行任何 docker 处置:止血手段为 flagd 关闭开关(config-plane),不在低风险 docker 白名单;且 restart/scale/migrate 无法改变 flagd 外部下发的 STATIC 开关值,故交人工"
+        ]
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "prometheus",
+        "logs",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ]
+}

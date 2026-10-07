@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "warning",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0044-kafka-resource",
+    "description": "告警描述为 orders topic Kafka 消费 lag 持续上升（flagd kafkaQueueProblems 触发，生产快于消费、消费者算力不足），属于典型队列积压故障，理论止血应为扩容 orders topic 消费者。但实时核验发现该告警与当前环境状态不符：当前环境中没有任何 kafka broker 或消费者（accounting/fraud-detection）容器在运行；Prometheus 的 __name__ 标签列表中不存在任何 kafka_* 指标（kafka_consumergroup_lag 查询返回空结果），说明当前环境从未部署/采集 kafka；flagd 配置文件中 kafkaQueueProblems 的 defaultVariant 仍为 \"off\"（故障注入从未生效或已回退）；告警 startsAt=2026-06-20 与当前时间 2026-08-18 相差近两个月，且所有运行中容器的启动时间（24分钟~11小时）均与该告警的生命周期不匹配。综合判断，这是一条陈旧/未在当前环境实际生效的失效告警，无法坐实\"积压正在真实发生\"，不具备执行任何止血操作的证据基础。"
+  },
+  "startsAt": "2026-07-21T09:30:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0044-kafka-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

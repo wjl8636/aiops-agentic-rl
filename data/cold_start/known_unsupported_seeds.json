@@ -1,0 +1,67 @@
+{
+  "_purpose": "记录 data/clean/split/train/ 里因为环境/机制缺失（不是诊断质量问题）本轮不强求通过拒绝采样的种子。不删除种子文件本身，只是不把它们计入本轮冷启动训练数据的达标目标；机制补齐后可以重新纳入。",
+  "_decided_by": "见 data/cold_start/fault_injection.py 模块 docstring 的实测结论 + 本次盘点（2026-09）",
+  "excluded_seeds": [
+    {
+      "seed": "seed_0095_parametrized_resource",
+      "service": "ad",
+      "category": "resource_cpu",
+      "reason": "adHighCpu flag 在 flagd 侧正确置为 on，但 ad 服务自身的 Java OpenFeature/gRPC 客户端不响应（枚举容器内线程名确认 CPULoad 高负载线程从未被拉起），是 ad 服务自身 bug，不是采集脚本问题。"
+    },
+    {
+      "seed": "seed_0096_parametrized_resource",
+      "service": "ad",
+      "category": "resource_cpu",
+      "reason": "同 seed_0095：adHighCpu 对 ad 服务不可观测。"
+    },
+    {
+      "seed": "seed_0586_historical_reverse_derivation_resource",
+      "service": "ad",
+      "category": "historical/CPU（关键词兜底命中 ad→adHighCpu）",
+      "reason": "关键词兜底后走到跟 seed_0095/0096 完全相同的 adHighCpu 机制，同样因 ad 服务客户端不响应而不可观测。"
+    },
+    {
+      "seed": "seed_0599_historical_reverse_derivation_resource",
+      "service": "payment",
+      "category": "historical/CPU（关键词兜底命中 CPU，但 payment 没有对应 flag）",
+      "reason": "_HIST_CPU_FLAGS 只覆盖 ad，payment 没有任何 flagd/CPU 注入机制，otel-demo 官方也没有给 payment 提供对应故障开关。"
+    },
+    {
+      "seed": "seed_0585_historical_reverse_derivation_deploy_regression",
+      "service": "checkout",
+      "category": "historical/内存泄漏（关键词兜底命中 内存，但只有 recommendation 有 fixture）",
+      "reason": "recommendation 内存泄漏 fixture 是唯一实现的 deploy_regression 注入机制，checkout 没有对应的泄漏 fixture 镜像/容器替换脚本。"
+    },
+    {
+      "seed": "seed_0588_historical_reverse_derivation_config",
+      "service": "checkout",
+      "category": "historical/config（证书轮换）",
+      "reason": "证书轮换/信任链配置类场景需要真的改容器内 TLS 证书链，没有现成机制，且被判定风险较高，明确排除在本轮范围之外（不打算临时拼装一套证书注入脚本冒险改容器内信任链配置）。"
+    }
+  ],
+  "not_excluded_kept_as_reject_with_real_evidence": [
+    {
+      "seed": "seed_0587_historical_reverse_derivation_dependency",
+      "service": "cart",
+      "real_result": "cartFailure flag 已真实注入（flagd 侧确认 on）。真实诊断 Agent 跑了 21 步，但从头到尾没有查过 cartFailure 这个真实存在的开关（只猜测/查询了 cartServiceFailure/cartSlow/cartBatchTimeout/cartReconcile 四个不存在的名字，全部 FLAG_NOT_FOUND），也没有调用 EmptyCart 去触发该 flag 真正的可观测效果（转去连 badhost:1234）。观测到的唯一异常是一段已自愈的 valkey-cart 连接失败（跟本次注入无关），据此给出 confidence=0.3、remediation_type=info_only，被 feishu_low_confidence 逃生口拒绝。",
+      "verdict": "保留 GT 不改。理由见下方 code_fix_route_decision。"
+    },
+    {
+      "seed": "seed_0595_historical_reverse_derivation_dependency",
+      "service": "product-catalog",
+      "real_result": "productCatalogFailure flag 已真实注入。真实诊断 Agent 用 Jaeger trace + flagd OFREP + Prometheus 给出了非常扎实的证据链，明确指出：该 flag 触发的是毫秒级即时 gRPC INTERNAL 错误，跟历史工单叙述的『批量导入脚本漏加超时→线程池打满→级联慢查询超时』是两种不同的故障机制，实测证据不支持后者，因此判定 remediation_type=online_op（建议人工关闭 flag，不属于处置白名单）而不是 code_fix，confidence=0.88，route=feishu_online_op（≠ GT 期望的 feishu_fix_unverified）。",
+      "verdict": "保留 GT 不改。理由见下方 code_fix_route_decision。"
+    }
+  ],
+  "code_fix_route_decision": {
+    "question": "seed_0587/seed_0595 的 ground_truth（remediation_type=code_fix, expect_route=feishu_fix_unverified）是否应该改成更符合系统当前能力边界的路由（如 info_only/feishu_online_op）？",
+    "decision": "不改，保留原状。",
+    "reasons": [
+      "1) 直接原因跟 code_fix 单仓架构限制（clone_service_repo 硬编码只 clone recommendation）无关：本次两条真实轨迹里，诊断 Agent 根本没有走到 remediation_type=='code_fix' 这个分支（0587 因证据不足走了 feishu_low_confidence 逃生口；0595 是基于扎实证据主动判定为 online_op），所以单仓限制这次并未被触发。就算 clone_service_repo 被修好去 clone 正确的服务仓，这两条本次也不会因此变成 code_fix。",
+      "2) 更深层的原因是 fault_injection.py 对 dependency 类历史工单场景使用的是『通用代理故障』（cartFailure/productCatalogFailure 这类 flagd 开关，效果是立即报错/连接失败），跟历史工单原始叙述的『下游查询没设超时->线程池占满->级联超时』这个具体故障签名不是同一种机制。0595 的诊断 Agent 精确指出了这个差异并拒绝生搬硬套历史剧本——这是我们希望诊断 Agent 具备的『不盲信历史工单叙述、以实时证据为准』的能力，如果因为它没有匹配上 GT 就把 GT 改成迎合这次模型的具体结论，等于反向奖励『照抄历史工单结论』而不是『尊重实时证据』，是错误的训练信号。",
+      "3) 即使某次真实运行里模型confidently 判定为 code_fix，data/cold_start/collect_trajectories.py 的 `_run_diagnose_capturing_steps()`/`_infer_route_real()` 目前设计上就不会去跑代码修复 Agent（对 remediation_type=='code_fix' 或 also_code_fix=True 的情况无条件返回 route=None，理由写在 `_infer_route_real()` 的 docstring 里）——这一点在本轮盘点里被重新验证：seed_0282/0283/0596（suspect_service=recommendation，code_fix 单仓限制在这三条里根本不适用）在诊断阶段都拿到了高置信度、正确识别 also_code_fix=True 的诊断结果，但 route 依然是 None、无法匹配 GT 期望的 *_and_code_fix_pr。也就是说，『采集管线不跑代码修复 Agent』这个更基础的架构缺口，跟 code_fix 单仓限制是两个独立的问题，且前者影响面更广（连 recommendation 都受影响）。这个缺口本次任务范围之外不展开修（需要真实跑一个会改代码/推分支/开 PR 的 Agent，风险和成本都超出本次盘点范围），如实记录下来。",
+      "4) 结论：这两条种子的 GT 依然是『系统理论上应该识别出需要 code_fix』这个合理期望，保留它们能持续暴露上述两层真实局限（代理故障信号跟历史剧本不完全对齐 + 采集管线不跑代码修复 Agent），比强行改成一个只为了『让这次这条轨迹能过』的路由更有长期价值。"
+    ],
+    "separately_confirmed_finding": "seed_0282 / seed_0283 / seed_0596（recommendation 内存泄漏，deploy_regression，GT expect_route=auto_remediated_and_code_fix_pr）三条本轮用真实 fixture 重新采集后，诊断质量都很高（confidence 0.93~0.95，正确定位泄漏 commit、执行了 docker restart 止血、also_code_fix=True），但 route 都是 None，同样卡在上面第 3 点的『采集管线不跑代码修复 Agent』这个缺口——跟 code_fix 单仓限制完全无关（suspect_service 全是 recommendation）。这是本次盘点里发现的、比任务原本描述的单仓限制更基础的一个系统性缺口，一并记录在这里，不在本轮修复范围内。"
+  }
+}

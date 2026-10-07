@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "warning",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0049-kafka-resource",
+    "description": "告警描述 orders topic Kafka 消费 lag 单调上升（flagd kafkaQueueProblems 触发，生产快于消费、消费者算力不足），理论上属于典型队列积压型故障。但当前环境实时核验与告警描述不一致：(1) docker ps 中无任何 kafka/orders/accounting/fraud-detection 等消费者相关容器，仅 recommendation、ad、flagd、otel-collector、jaeger、prometheus、opensearch、milvus、gitea 等基础设施/无关服务在跑；(2) Prometheus 查询 kafka_consumergroup_lag 返回空结果集，__name__ 标签中也无任何 kafka_* 指标，说明当前环境未部署/未采集 Kafka；(3) 直接读取故障注入配置 vendor/otel-demo/src/flagd/demo.flagd.json:49-57，kafkaQueueProblems 的 state=ENABLED 但 defaultVariant 仍为 \"off\"，即该故障场景从未被实际触发或已回退；(4) 告警 startsAt=2026-06-20T10:10:00Z 与当前时间 2026-08-18T02:51Z 相差近两个月，且当前容器生命周期（多数 Up 11 小时，recommendation 仅 19 分钟）与告警发生时并非同一次环境运行周期。综合判断：这是一条陈旧/未在当前环境实际生效的失效告警，当前不存在可确认的真实 Kafka 积压问题，无法定位到\"正在发生\"的根因。"
+  },
+  "startsAt": "2026-07-20T08:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0049-kafka-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "RecommendationCacheMiss",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 缓存层失效，接口延迟明显上升",
+    "description": "recommendation 服务的缓存层失效（recommendationCacheFailure 开关被打开），缓存全部穿透到重算路径，/recommend 接口延迟明显上升。服务进程健康、CPU/内存正常，近期无发版。请定位确认后给出处置建议。"
+  },
+  "startsAt": "2026-09-04T15:20:00Z",
+  "scenario_hint": "[v9增强/C1_早收敛] flag=recommendationCacheFailure：单 flag、单服务、证据链清晰——验证「Skill → OFREP 查 flag → 1-2 步旁证 → 收敛，总步数 ≤8」的效率目标行为"
+}

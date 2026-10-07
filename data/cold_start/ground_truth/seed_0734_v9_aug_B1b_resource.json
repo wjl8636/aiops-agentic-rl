@@ -1,0 +1,38 @@
+{
+  "remediation_type": "online_op",
+  "expect_remediation_any_of": [
+    "online_op",
+    "info_only"
+  ],
+  "suspect_service": "ad",
+  "expect_route": "feishu_low_confidence",
+  "expect_kind_any_of": [
+    "resource",
+    "config"
+  ],
+  "expect_confidence_range": [
+    0.0,
+    0.59
+  ],
+  "expect_negative_claim": {
+    "object": null,
+    "markers": [
+      "未能定位",
+      "未找到",
+      "无法确认",
+      "无法定位",
+      "证据不足",
+      "未观测到",
+      "无法排除",
+      "不能确认",
+      "未能确认",
+      "无法确定",
+      "无法复现",
+      "矛盾",
+      "未能证实",
+      "未真正",
+      "存疑"
+    ]
+  },
+  "_family": "B1b"
+}

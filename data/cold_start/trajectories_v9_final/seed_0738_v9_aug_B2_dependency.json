@@ -1,0 +1,197 @@
+{
+  "alert": {
+    "alertname": "EmailSmtpP95SlightlyElevated",
+    "service": "email",
+    "labels": {
+      "service": "email",
+      "severity": "info",
+      "job": "emailservice"
+    },
+    "annotations": {
+      "summary": "email 发信耗时 p95 比基线高 8%，info 级敏感阈值触发",
+      "description": "新上线的监控规则把 email 发信耗时的告警阈值调得很敏感，今早该规则第一次触发：p95 比前一周基线高 8%，仍在历史正常波动带内（info 级别）。发信成功率、队列深度均正常，没有用户投诉。请复核这条提示是否对应真实异常，还是阈值过于敏感产生的噪声。"
+    },
+    "startsAt": "2026-09-07T08:30:00Z",
+    "scenario_hint": "[v9增强/B2_噪声info级] kind=dependency service=email：不注入任何故障，info 级阈值敏感度叙事（A1 的姊妹型）——验证「查过→确认无异常→info_only」，与 B1 的「有故障但看不清」形成对照"
+  },
+  "alert_id": "seed_0738_v9_aug_B2_dependency",
+  "final_diagnosis": {
+    "summary": "email 服务实际健康,发信 p95 稳定在 ~48ms、成功率约 99.9%、无发版无重启,告警是新上线监控规则阈值过敏(p95 高 8% 仍在正常波动带内)产生的噪声,非真实异常,建议放宽/复核该 info 级告警规则,无需对 email 服务做任何处置。",
+    "kind": "config",
+    "suspect_service": "email",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "info_only",
+    "remediation_detail": "无需对 email 服务执行任何线上/代码处置——服务健康。根因在监控侧:新上线的 EmailSmtpP95SlightlyElevated 规则阈值设得过于敏感(把仍在历史正常波动带内的 +8% p95 抖动也判为告警)。建议由监控/SRE 团队复核并放宽该 info 级规则阈值(例如提高触发百分比或加长评估窗口/降噪),避免持续产生噪声告警。本次未执行任何自动止血(证据表明无异常可止)。",
+    "confidence": 0.85,
+    "evidence": [
+      "容器状态:docker inspect email → RestartCount=0, OOMKilled=false, StartedAt=2026-08-18(运行约3周,无近期发版/重启),镜像 latest-email 未更新",
+      "p95 趋势:Prometheus query_range histogram_quantile(0.95, rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"email\",span_name=\"POST /send_order_confirmation\"}[5m])) 近6h 稳定在 ~48ms,偶有 87-92ms 的良性抖动,处于正常波动带,无持续抬升",
+      "成功率:traces_span_metrics_calls_total{service_name=\"email\"} 中 send_order_confirmation UNSET=1096 vs STATUS_CODE_ERROR=1,错误率约 0.09%,发信成功率正常",
+      "日志佐证:docker logs email 最近请求全部 HTTP 200,单请求耗时 0.0121-0.0455s(12-45ms),无慢请求/报错/SMTP 异常",
+      "告警自身描述:info 级,p95 仅高基线 8% 且在历史正常波动带内,发信成功率与队列深度均正常、无用户投诉,与实时观测一致 → 判定为敏感阈值噪声"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "info_only",
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"email 服务实际健康,发信 p95 稳定在 ~48ms、成功率约 99.9%、无发版无重启,告警是新上线监控规则阈值过敏(p95 高 8% 仍在正常波动带内)产生的噪声,非真实异常,建议放宽/复核该 info 级告警规则,无需对 email 服务做任何处置。\",\"kind\":\"config\",\"suspect_service\":\"email\",\"remediation_type\":\"info_only\",\"remediation_detail\":\"无需对 email 服务执行任何线上/代码处置——服务健康。根因在监控侧:新上线的 EmailSmtpP95SlightlyElevated 规则阈值设得过于敏感(把仍在历史正常波动带内的 +8% p95 抖动也判为告警)。建议由监控/SRE 团队复核并放宽该 info 级规则阈值(例如提高触发百分比或加长评估窗口/降噪),避免持续产生噪声告警。本次未执行任何自动止血(证据表明无异常可止)。\",\"confidence\":0.85,\"evidence\":[\"容器状态:docker inspect email → RestartCount=0, OOMKilled=false, StartedAt=2026-08-18(运行约3周,无近期发版/重启),镜像 latest-email 未更新\",\"p95 趋势:Prometheus query_range histogram_quantile(0.95, rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\\\"email\\\",span_name=\\\"POST /send_order_confirmation\\\"}[5m])) 近6h 稳定在 ~48ms,偶有 87-92ms 的良性抖动,处于正常波动带,无持续抬升\",\"成功率:traces_span_metrics_calls_total{service_name=\\\"email\\\"} 中 send_order_confirmation UNSET=1096 vs STATUS_CODE_ERROR=1,错误率约 0.09%,发信成功率正常\",\"日志佐证:docker logs email 最近请求全部 HTTP 200,单请求耗时 0.0121-0.0455s(12-45ms),无慢请求/报错/SMTP 异常\",\"告警自身描述:info 级,p95 仅高基线 8% 且在历史正常波动带内,发信成功率与队列深度均正常、无用户投诉,与实时观测一致 → 判定为敏感阈值噪声\"],\"suspect_repo\":null,\"suspect_commit_hint\":null,\"suspect_file_hint\":null,\"also_code_fix\":false}",
+    "teacher_model": "claude-4.8-opus-google",
+    "usage": {
+      "input_tokens": 2747,
+      "output_tokens": 3581,
+      "cache_creation_input_tokens": 46585,
+      "cache_read_input_tokens": 145320
+    },
+    "cost_usd": 0.46707625,
+    "num_turns": 8,
+    "duration_ms": 63035,
+    "model_usage": {
+      "claude-4.8-opus-google": {
+        "inputTokens": 2747,
+        "outputTokens": 3581,
+        "cacheReadInputTokens": 145320,
+        "cacheCreationInputTokens": 46585,
+        "webSearchRequests": 0,
+        "costUSD": 0.46707625,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000,
+        "canonicalModel": "claude-4.8-opus-google",
+        "provider": "firstParty"
+      }
+    },
+    "pruning": {
+      "steps_before": 7,
+      "steps_after": 6,
+      "removed": [
+        {
+          "step_index_1based": 5,
+          "tool_name": "Bash",
+          "reason": "failed-query-retry:docker-logs:email",
+          "command_snippet": "for f in deploys.log ./*/deploys.log; do [ -f \"$f\" ] && echo \"== $f ==\" && grep -i email \"$f\" | tail -5; done 2>/dev/null\necho '--- email image labels / created"
+        }
+      ],
+      "restored_by_verification": []
+    }
+  },
+  "steps": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps -a --format '{{.Names}}\\t{{.Status}}\\t{{.Image}}' | grep -Ei 'email|smtp' ; echo '---ALL---'; docker ps --format '{{.Names}}' | sort",
+        "description": "List email-related containers and all running containers"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "email\tUp 2 weeks\tghcr.nju.edu.cn/open-telemetry/demo:latest-email\n---ALL---\naccounting\nad\naiops-gitea\naiops-milvus\naiops-milvus-etcd\naiops-milvus-minio\ncart\ncheckout\ncurrency\nemail\nflagd\nfraud-detection\nfrontend\nfrontend-proxy\nimage-provider\njaeger\nkafka\nload-generator\nopensearch\notel-collector\npayment\nproduct-catalog\nprometheus\nquote\nrecommendation\nshipping\nvalkey-cart",
+      "signal_types_covered": [
+        "prometheus",
+        "jaeger",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s --data-urlencode 'query={service_name=\"email\"}' 'http://localhost:9090/api/v1/query' | head -c 3000; echo",
+        "description": "Query Prometheus for email service metrics"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_sum\",\"job\":\"opentelemetry-demo/email\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_SERVER\",\"span_name\":\"POST /send_order_confirmation\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788849708.367,\"20243.463875999976\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"job\":\"opentelemetry-demo/email\",\"le\":\"15000\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_INTERNAL\",\"span_name\":\"send_email\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788849708.367,\"1096\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_sum\",\"job\":\"opentelemetry-demo/email\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_INTERNAL\",\"span_name\":\"send_email\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788849708.367,\"12224.271654000018\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"job\":\"opentelemetry-demo/email\",\"le\":\"50\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_SERVER\",\"span_name\":\"POST /send_order_confirmation\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788849708.367,\"1067\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"job\":\"opentelemetry-demo/email\",\"le\":\"4\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_INTERNAL\",\"span_name\":\"send_email\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788849708.367,\"105\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"job\":\"opentelemetry-demo/email\",\"le\":\"2000\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_SERVER\",\"span_name\":\"POST /send_order_confirmation\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788849708.367,\"1096\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"job\":\"opentelemetry-demo/email\",\"le\":\"+Inf\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_SERVER\",\"span_name\":\"POST /send_order_confirmation\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788849708.367,\"1096\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"job\":\"opentelemetry-demo/email\",\"le\":\"2000\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_INTERNAL\",\"span_name\":\"send_email\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788849708.367,\"1096\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"job\":\"opentelemetry-demo/email\",\"le\":\"10\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_INTERNAL\",\"span_name\":\"sinatra.render_template\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788849708.367,\"2166\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"job\":\"opentelemetry-de",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker inspect --format '{{.RestartCount}} OOM={{.State.OOMKilled}} Started={{.State.StartedAt}}' email\necho '--- error rate ---'\ncurl -s -g 'http://localhost:9090/api/v1/query?query=traces_span_metrics_calls_total{service_name=\"email\",status_code=\"STATUS_CODE_ERROR\"}' | head -c 800; echo\necho '--- total calls ---'\ncurl -s -g 'http://localhost:9090/api/v1/query?query=traces_span_metrics_calls_total{service_name=\"email\"}' | head -c 1200; echo",
+        "description": "Check email restart count and error/total call metrics"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "0 OOM=false Started=2026-08-18T08:02:59.312942538Z\n--- error rate ---\n{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"job\":\"opentelemetry-demo/email\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_INTERNAL\",\"span_name\":\"sinatra.render_template\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788849720.994,\"1\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"job\":\"opentelemetry-demo/email\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_SERVER\",\"span_name\":\"POST /send_order_confirmation\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788849720.994,\"1\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"job\":\"opentelemetry-demo/email\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span\n--- total calls ---\n{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"job\":\"opentelemetry-demo/email\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_INTERNAL\",\"span_name\":\"send_email\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788849721.037,\"1096\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"job\":\"opentelemetry-demo/email\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_INTERNAL\",\"span_name\":\"sinatra.render_template\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788849721.037,\"2192\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"job\":\"opentelemetry-demo/email\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_SERVER\",\"span_name\":\"POST /send_order_confirmation\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788849721.037,\"1096\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"job\":\"opentelemetry-demo/email\",\"service_name\":\"email\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_INTERNAL\",\"span_name\":\"sinatra.render_template\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[17888",
+      "signal_types_covered": [
+        "prometheus",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo '--- p95 over last 6h (server span send_order_confirmation) ---'\ncurl -s -g \"http://localhost:9090/api/v1/query_range?query=histogram_quantile(0.95,sum(rate(traces_span_metrics_duration_milliseconds_bucket%7Bservice_name%3D%22email%22%2Cspan_name%3D%22POST%20%2Fsend_order_confirmation%22%7D%5B5m%5D))by(le))&start=$(($(date +%s)-21600))&end=$(date +%s)&step=1800\" | head -c 2500; echo",
+        "description": "Query email p95 latency range over 6h"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "--- p95 over last 6h (server span send_order_confirmation) ---\n{\"status\":\"success\",\"data\":{\"resultType\":\"matrix\",\"result\":[{\"metric\":{},\"values\":[[1788833521,\"47.5\"],[1788835321,\"92.5\"],[1788837121,\"48\"],[1788838921,\"46.66666666666667\"],[1788840721,\"47.99999999999999\"],[1788842521,\"48\"],[1788844321,\"47.99999999999999\"],[1788846121,\"48\"],[1788847921,\"87.49999999999999\"],[1788849721,\"47.99999999999999\"]]}]}}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker inspect --format '{{.Created}} img={{.Config.Image}}' email; echo '--- logs ---'; docker logs email --tail 20 2>&1 | tail -20",
+        "description": "Email image creation date and recent logs"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "2026-08-18T08:02:59.105969609Z img=ghcr.nju.edu.cn/open-telemetry/demo:latest-email\n--- logs ---\nOrder confirmation email sent to: tobias@example.com\n172.19.0.23 - - [08/Sep/2026:06:35:39 +0000] \"POST /send_order_confirmation HTTP/1.1\" 200 - 0.0206\nOrder confirmation email sent to: jack@example.com\n172.19.0.23 - - [08/Sep/2026:06:36:15 +0000] \"POST /send_order_confirmation HTTP/1.1\" 200 - 0.0178\nOrder confirmation email sent to: larry_sergei@example.com\n172.19.0.23 - - [08/Sep/2026:06:36:18 +0000] \"POST /send_order_confirmation HTTP/1.1\" 200 - 0.0267\nOrder confirmation email sent to: bill@example.com\n172.19.0.23 - - [08/Sep/2026:06:36:34 +0000] \"POST /send_order_confirmation HTTP/1.1\" 200 - 0.0192\nOrder confirmation email sent to: larry_sergei@example.com\n172.19.0.23 - - [08/Sep/2026:06:36:54 +0000] \"POST /send_order_confirmation HTTP/1.1\" 200 - 0.0434\nOrder confirmation email sent to: reed@example.com\n172.19.0.23 - - [08/Sep/2026:06:37:59 +0000] \"POST /send_order_confirmation HTTP/1.1\" 200 - 0.0455\nOrder confirmation email sent to: bill@example.com\n172.19.0.23 - - [08/Sep/2026:06:38:19 +0000] \"POST /send_order_confirmation HTTP/1.1\" 200 - 0.0129\nOrder confirmation email sent to: steve@example.com\n172.19.0.23 - - [08/Sep/2026:06:39:44 +0000] \"POST /send_order_confirmation HTTP/1.1\" 200 - 0.0255\nOrder confirmation email sent to: jeff@example.com\n172.19.0.23 - - [08/Sep/2026:06:41:34 +0000] \"POST /send_order_confirmation HTTP/1.1\" 200 - 0.0314\nOrder confirmation email sent to: jack@example.com\n172.19.0.23 - - [08/Sep/2026:06:41:55 +0000] \"POST /send_order_confirmation HTTP/1.1\" 200 - 0.0121",
+      "signal_types_covered": [
+        "logs",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "email 服务实际健康,发信 p95 稳定在 ~48ms、成功率约 99.9%、无发版无重启,告警是新上线监控规则阈值过敏(p95 高 8% 仍在正常波动带内)产生的噪声,非真实异常,建议放宽/复核该 info 级告警规则,无需对 email 服务做任何处置。",
+        "kind": "config",
+        "suspect_service": "email",
+        "remediation_type": "info_only",
+        "remediation_detail": "无需对 email 服务执行任何线上/代码处置——服务健康。根因在监控侧:新上线的 EmailSmtpP95SlightlyElevated 规则阈值设得过于敏感(把仍在历史正常波动带内的 +8% p95 抖动也判为告警)。建议由监控/SRE 团队复核并放宽该 info 级规则阈值(例如提高触发百分比或加长评估窗口/降噪),避免持续产生噪声告警。本次未执行任何自动止血(证据表明无异常可止)。",
+        "confidence": 0.85,
+        "evidence": [
+          "容器状态:docker inspect email → RestartCount=0, OOMKilled=false, StartedAt=2026-08-18(运行约3周,无近期发版/重启),镜像 latest-email 未更新",
+          "p95 趋势:Prometheus query_range histogram_quantile(0.95, rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"email\",span_name=\"POST /send_order_confirmation\"}[5m])) 近6h 稳定在 ~48ms,偶有 87-92ms 的良性抖动,处于正常波动带,无持续抬升",
+          "成功率:traces_span_metrics_calls_total{service_name=\"email\"} 中 send_order_confirmation UNSET=1096 vs STATUS_CODE_ERROR=1,错误率约 0.09%,发信成功率正常",
+          "日志佐证:docker logs email 最近请求全部 HTTP 200,单请求耗时 0.0121-0.0455s(12-45ms),无慢请求/报错/SMTP 异常",
+          "告警自身描述:info 级,p95 仅高基线 8% 且在历史正常波动带内,发信成功率与队列深度均正常、无用户投诉,与实时观测一致 → 判定为敏感阈值噪声"
+        ],
+        "suspect_repo": null,
+        "suspect_commit_hint": null,
+        "suspect_file_hint": null,
+        "also_code_fix": false
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "prometheus",
+        "logs",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "CartValkeyTimeoutHistoricalBlip",
+  "service": "cart",
+  "labels": {
+    "service": "cart",
+    "severity": "warning",
+    "job": "cartservice"
+  },
+  "annotations": {
+    "summary": "监控记录到 cart 连接 valkey-cart 出现过几次超时，怀疑依赖故障",
+    "description": "监控在过去 1 小时内记录到 3 次 cart 服务连接 valkey-cart（cart 的会话缓存依赖）超时的日志片段，怀疑存在依赖故障。复检 flagd 当前加载的配置文件，cartFailure开关的 defaultVariant 目前是 off；docker ps 显示 cart 和 valkey-cart 容器都在正常运行、没有重启记录；docker logs 最近 80 行没有任何连接失败/超时相关的ERROR；Prometheus 上 cart 服务的调用错误率为 0。怀疑这 3 次超时是短暂网络抖动留下的历史记录，此刻已经自愈，不是持续性的依赖故障。"
+  },
+  "startsAt": "2026-09-01T11:00:00Z",
+  "scenario_hint": "[参数化扩增/pure_info_only] kind=dependency service=cart：cartFailure 开关当前为 off，valkey-cart/cart 容器均健康，服务当前真实健康，不注入任何故障：验证「历史噪音已自愈时应如实报 info_only」这一场景，覆盖 dependency 这个kind（跟已有的 pure_info_only 种子是 resource kind 不同）"
+}

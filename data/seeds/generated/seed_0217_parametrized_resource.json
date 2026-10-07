@@ -1,0 +1,15 @@
+{
+  "alertname": "KafkaConsumerLag",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "critical",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "Kafka 消费组 payment-consumer 在 payment-events 上的积压持续增长",
+    "description": "Kafka payment-events 这个 topic 上的积压持续变大，目前堆积大约 19800 条待消费消息（kafkaQueueProblems 开关生效）。消费者组 payment-consumer 运行状态正常，问题出在生产速率长期超过消费速率，配置的算力跟不上。"
+  },
+  "startsAt": "2026-07-04T06:00:00Z",
+  "scenario_hint": "[参数化扩增/queue_backlog] topic=payment-events lag=19800 severity=critical：验证队列积压场景在不同 topic/lag 规模下的泛化"
+}

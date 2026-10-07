@@ -1,0 +1,15 @@
+{
+  "alertname": "HighCpuUsageV2",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "ad 服务的 CPU 使用率飙升，需紧急扩容处理",
+    "description": "ad 服务容器的 CPU 使用率长时间维持在高位并触发了告警，怀疑是 flagd 开关 adServiceHighCpu 引发的资源型故障，建议尽快扩容或重启进行缓解。"
+  },
+  "startsAt": "2026-06-20T10:06:00Z",
+  "scenario_hint": "flagd 开关引发的资源型故障（措辞微调版）"
+}

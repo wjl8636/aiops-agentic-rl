@@ -1,0 +1,15 @@
+{
+  "alertname": "MemoryLeakOOM",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 服务内存持续上涨、趋向 OOM",
+    "description": "recommendation（Python/gRPC）容器的工作集内存在负载下单调上升，重启次数不断增加（被 OOMKilled）。问题从最近一次发版之后立刻开始，怀疑是最近一次发版引入的某个 commit 里错误使用了 WeakSet/WeakValueDictionary（例如外部仍持有强引用，或者存进去的对象类型本身不支持被弱引用而退化成强引用），本该被回收的对象实际从未被回收。"
+  },
+  "startsAt": "2026-07-07T00:00:00Z",
+  "scenario_hint": "[参数化扩增/deploy_regression] 泄漏机制=WeakSet 用错（misused_weakset）：内存泄漏 capstone 的泄漏点变体，对应 scripts/fixtures/recommendation 的不同 fixture 版本"
+}

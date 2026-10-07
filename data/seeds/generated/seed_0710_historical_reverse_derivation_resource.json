@@ -1,0 +1,15 @@
+{
+  "alertname": "KafkaPromoConsumerLagSpike",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "warning",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "促销活动开始后 promo-events 主题的消费延迟骤增",
+    "description": "运营在活动开始时刻对 promo-events 主题发起了一轮批量优惠券发放任务，短时间内生产的消息量达到日常峰值的数倍，promo-consumer 消费者组的处理速率没有相应提升，consumer lag 在几分钟内迅速堆积到平时的十几倍，下游发放优惠券的处理明显滞后。容量规划记录显示 promo-consumer 副本数近期没有变化，问题根源是生产端的瞬时突发流量，不是消费端配置被误改。"
+  },
+  "startsAt": "2026-09-06T10:00:00Z",
+  "scenario_hint": "[历史工单反演/static] source_ticket=hist-2026-09-promo-consumer-burst-lag flag=kafkaQueueProblems：2026-09 补充批次，手写历史工单摘要反向抽取的告警，显式标注 flag= 保证 fault_injection.py 按 flag=/flags= 精确路由（优先级高于 _inject_historical_fault() 的关键词兜底），不依赖脆弱的中文关键词猜测"
+}

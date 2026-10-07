@@ -1,0 +1,267 @@
+{
+  "alert": {
+    "alertname": "HistoricalTicketReplay",
+    "service": "recommendation",
+    "labels": {
+      "service": "recommendation",
+      "severity": "critical",
+      "job": "recommendation"
+    },
+    "annotations": {
+      "summary": "历史工单反演：milvus-0065-recommendation-deploy_regression",
+      "description": "recommendation 服务在最新发版(image/sha=e482193, deploys.log 标记 LATEST_DEPLOY suspect, 替换 baseline f8a6666)后内存单调上升趋向 OOM。根因是 recommendation_server.py 模块级列表 _seen_product_ids 每次 get_recommendations 被无界 extend 且从不裁剪，持续负载下工作集内存无上限增长直至 OOMKilled。混合根因：已重启单实例止血，但需改代码为该缓存加界方可根治，否则下次发版复发。"
+    },
+    "startsAt": "2026-07-21T02:00:00Z",
+    "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0065-recommendation-deploy_regression：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+  },
+  "alert_id": "seed_0609_historical_reverse_derivation_deploy_regression",
+  "final_diagnosis": {
+    "summary": "recommendation 服务当前运行的容器镜像(recommendation-leak-fixture:test)是\"leak revision\"(docker logs 明确输出 \"serving on :9001 (leak revision)\")：recommendation_server.py 中模块级列表 _seen_product_ids 在每次 get_recommendations 调用时被无界 extend、从未裁剪(对应仓库中 commit f18f452 \"perf: track all seen product ids for analytics\" 把原先 baseline ac26792 的 deque(maxlen=128) 改成了无界 list)，持续 ~400rps 负载下工作集内存会单调增长直至 OOM。已确认工作区 workspace/recommendation 当前签出分支 fix/bounded-seen-product-ids-oom-20260819 上已经存在修复 commit 16837d0(把该列表改回 deque(maxlen=...) 限界)，但该修复尚未打入正在运行的容器镜像，故仍需代码/发布层面根治。已执行 docker restart recommendation 作为止血：重启前内存 18.29MiB，重启后 10.89MiB(RestartCount 计数在重启后归零，容器 StartedAt 更新为 07:31:49)，工作集已清零，但由于运行镜像仍是未限界的 leak revision，若不重新部署已存在的修复(16837d0)会再次单调增长直至 OOM。",
+    "kind": "deploy_regression",
+    "suspect_service": "recommendation",
+    "suspect_repo": "recommendation",
+    "suspect_commit_hint": "f18f452",
+    "suspect_file_hint": "recommendation_server.py",
+    "remediation_type": "online_op",
+    "remediation_detail": "已自动执行低风险止血：`docker restart recommendation`（重启单实例）。效果：重启前 docker stats 显示 18.29MiB/1GiB(1.79%)，重启后降至 10.89MiB/1GiB(1.06%)，RestartCount 重置、StartedAt 更新为 2026-09-06T07:31:49Z，工作集内存已清零，属临时止血。根治需代码层面：recommendation_server.py 中 `_seen_product_ids` 应保持为限界结构（如 `deque(maxlen=N)`）而非无界 `list`，避免 get_recommendations 每次调用无界 extend。注意：workspace/recommendation 当前签出分支 fix/bounded-seen-product-ids-oom-20260819 上已存在修复 commit 16837d0(“fix: bound _seen_product_ids to stop unbounded memory growth”)，实现即是把该列表改回 deque(maxlen=...)；但正在运行的容器镜像 recommendation-leak-fixture:test 里跑的仍是未限界版本（docker logs 显示 \"(leak revision)\"），需要将该修复构建打入镜像并重新发布，否则本次重启只是临时缓解，负载持续下会再次单调增长直至 OOM。",
+    "confidence": 0.9,
+    "evidence": [
+      "docker ps: recommendation 容器镜像为 recommendation-leak-fixture:test",
+      "docker logs recommendation --tail 50: 明确输出 '[recommendation] serving on :9001 (leak revision)' 和 '[recommendation] background load started ~400.0 rps'，确认当前运行的是未限界(leak)版本且持续承受负载",
+      "deploys.log: 显示 recommendation 部署历史 baseline=ac26792 -> LATEST_DEPLOY(suspect)=f18f452（SHA 与告警文本中的 e482193/f8a6666 不一致，属历史工单模板复现文本，以实测 deploys.log 为准）",
+      "workspace/recommendation git diff ac26792 f18f452 -- recommendation_server.py: 显示 _seen_product_ids 从 'deque[str] = deque(maxlen=128)  # bounded: recent ids only' 改为无界 'list[str] = []'，注释标注 '# BAD (s4 planted leak): module-level unbounded accumulation'",
+      "workspace/recommendation git log --oneline: 显示后续修复 commit 16837d0 'fix: bound _seen_product_ids to stop unbounded memory growth'（当前签出分支 fix/bounded-seen-product-ids-oom-20260819），但该修复未打入正在运行的容器镜像",
+      "docker stats --no-stream recommendation（重启前）: MEM USAGE 18.29MiB/1GiB(1.79%)",
+      "已执行处置命令 `docker restart recommendation`；重启后 docker inspect 显示 StartedAt=2026-09-06T07:31:49.506871699Z、RestartCount=0，docker stats 显示 MEM USAGE 降至 10.89MiB/1GiB(1.06%)，确认止血生效"
+    ],
+    "time_window": {
+      "from": "2026-07-21T02:00:00Z",
+      "to": "2026-09-06T07:32:00Z"
+    },
+    "also_code_fix": true,
+    "executed_actions": [
+      {
+        "action": "restart_instance",
+        "target": "recommendation",
+        "command": "docker restart recommendation",
+        "ts": "2026-09-06T07:31:39Z"
+      }
+    ]
+  },
+  "ground_truth": null,
+  "route": null,
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"recommendation 服务当前运行的容器镜像(recommendation-leak-fixture:test)是\\\"leak revision\\\"(docker logs 明确输出 \\\"serving on :9001 (leak revision)\\\")：recommendation_server.py 中模块级列表 _seen_product_ids 在每次 get_recommendations 调用时被无界 extend、从未裁剪(对应仓库中 commit f18f452 \\\"perf: track all seen product ids for analytics\\\" 把原先 baseline ac26792 的 deque(maxlen=128) 改成了无界 list)，持续 ~400rps 负载下工作集内存会单调增长直至 OOM。已确认工作区 workspace/recommendation 当前签出分支 fix/bounded-seen-product-ids-oom-20260819 上已经存在修复 commit 16837d0(把该列表改回 deque(maxlen=...) 限界)，但该修复尚未打入正在运行的容器镜像，故仍需代码/发布层面根治。已执行 docker restart recommendation 作为止血：重启前内存 18.29MiB，重启后 10.89MiB(RestartCount 计数在重启后归零，容器 StartedAt 更新为 07:31:49)，工作集已清零，但由于运行镜像仍是未限界的 leak revision，若不重新部署已存在的修复(16837d0)会再次单调增长直至 OOM。\",\"kind\":\"deploy_regression\",\"suspect_service\":\"recommendation\",\"suspect_repo\":\"recommendation\",\"suspect_commit_hint\":\"f18f452\",\"suspect_file_hint\":\"recommendation_server.py\",\"remediation_type\":\"online_op\",\"also_code_fix\":true,\"remediation_detail\":\"已自动执行低风险止血：`docker restart recommendation`（重启单实例）。效果：重启前 docker stats 显示 18.29MiB/1GiB(1.79%)，重启后降至 10.89MiB/1GiB(1.06%)，RestartCount 重置、StartedAt 更新为 2026-09-06T07:31:49Z，工作集内存已清零，属临时止血。根治需代码层面：recommendation_server.py 中 `_seen_product_ids` 应保持为限界结构（如 `deque(maxlen=N)`）而非无界 `list`，避免 get_recommendations 每次调用无界 extend。注意：workspace/recommendation 当前签出分支 fix/bounded-seen-product-ids-oom-20260819 上已存在修复 commit 16837d0(“fix: bound _seen_product_ids to stop unbounded memory growth”)，实现即是把该列表改回 deque(maxlen=...)；但正在运行的容器镜像 recommendation-leak-fixture:test 里跑的仍是未限界版本（docker logs 显示 \\\"(leak revision)\\\"），需要将该修复构建打入镜像并重新发布，否则本次重启只是临时缓解，负载持续下会再次单调增长直至 OOM。\",\"confidence\":0.9,\"evidence\":[\"docker ps: recommendation 容器镜像为 recommendation-leak-fixture:test\",\"docker logs recommendation --tail 50: 明确输出 '[recommendation] serving on :9001 (leak revision)' 和 '[recommendation] background load started ~400.0 rps'，确认当前运行的是未限界(leak)版本且持续承受负载\",\"deploys.log: 显示 recommendation 部署历史 baseline=ac26792 -> LATEST_DEPLOY(suspect)=f18f452（SHA 与告警文本中的 e482193/f8a6666 不一致，属历史工单模板复现文本，以实测 deploys.log 为准）\",\"workspace/recommendation git diff ac26792 f18f452 -- recommendation_server.py: 显示 _seen_product_ids 从 'deque[str] = deque(maxlen=128)  # bounded: recent ids only' 改为无界 'list[str] = []'，注释标注 '# BAD (s4 planted leak): module-level unbounded accumulation'\",\"workspace/recommendation git log --oneline: 显示后续修复 commit 16837d0 'fix: bound _seen_product_ids to stop unbounded memory growth'（当前签出分支 fix/bounded-seen-product-ids-oom-20260819），但该修复未打入正在运行的容器镜像\",\"docker stats --no-stream recommendation（重启前）: MEM USAGE 18.29MiB/1GiB(1.79%)\",\"已执行处置命令 `docker restart recommendation`；重启后 docker inspect 显示 StartedAt=2026-09-06T07:31:49.506871699Z、RestartCount=0，docker stats 显示 MEM USAGE 降至 10.89MiB/1GiB(1.06%)，确认止血生效\"],\"time_window\":{\"from\":\"2026-07-21T02:00:00Z\",\"to\":\"2026-09-06T07:32:00Z\"}}",
+    "pruning": {
+      "steps_before": 12,
+      "steps_after": 12,
+      "removed": [],
+      "restored_by_verification": []
+    }
+  },
+  "steps": [
+    {
+      "tool_name": "Skill",
+      "tool_input": {
+        "skill": "memory-oom"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Launching skill: memory-oom",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cat deploys.log 2>/dev/null | grep -i recommendation | tail -20",
+        "description": "Check deploys.log for recommendation entries"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "2026-07-05T05:23:38Z  recommendation  image=recommendation:ac26792  sha=ac26792  note=baseline\n2026-07-05T05:23:38Z  recommendation  image=recommendation:f18f452  sha=f18f452  note=LATEST_DEPLOY (suspect)",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps --filter \"name=recommendation\" --format '{{.Names}}\\t{{.Status}}\\t{{.Image}}'",
+        "description": "List recommendation containers"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "recommendation\tUp 15 seconds\trecommendation-leak-fixture:test",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cat deploys.log 2>/dev/null | tail -50",
+        "description": "Show full deploys.log"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "# service deploy history (image tag = git SHA)\n2026-07-05T05:23:38Z  recommendation  image=recommendation:ac26792  sha=ac26792  note=baseline\n2026-07-05T05:23:38Z  recommendation  image=recommendation:f18f452  sha=f18f452  note=LATEST_DEPLOY (suspect)",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker inspect recommendation --format 'Image={{.Config.Image}} RestartCount={{.RestartCount}} OOMKilled={{.State.OOMKilled}} StartedAt={{.State.StartedAt}}'",
+        "description": "Inspect recommendation container state"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Image=recommendation-leak-fixture:test RestartCount=0 OOMKilled=false StartedAt=2026-09-06T07:30:37.675860086Z",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker stats --no-stream recommendation 2>/dev/null",
+        "description": "Check current memory usage of recommendation container"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "CONTAINER ID   NAME             CPU %     MEM USAGE / LIMIT   MEM %     NET I/O       BLOCK I/O     PIDS\ne9fa862a0a43   recommendation   1.19%     18.29MiB / 1GiB     1.79%     726B / 126B   0B / 2.06MB   2",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd workspace/recommendation 2>/dev/null && git log --oneline -10 && echo \"---diff ac26792..f18f452---\" && git diff ac26792 f18f452 -- . 2>/dev/null | head -100",
+        "description": "Check git log and diff between baseline and suspect SHA"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "16837d0 fix: bound _seen_product_ids to stop unbounded memory growth\nf18f452 perf: track all seen product ids for analytics\nac26792 recommendation service baseline (bounded recent-id cache)\n---diff ac26792..f18f452---\ndiff --git a/recommendation_server.py b/recommendation_server.py\nindex ca4a4a5..1d67333 100644\n--- a/recommendation_server.py\n+++ b/recommendation_server.py\n@@ -1,6 +1,6 @@\n \"\"\"Minimal recommendation service (stand-in for the OTel demo's Python service).\n \n-Clean baseline revision (bounded recent-id cache). Two things matter here:\n+s4 capstone — the \"bad\" (planted) revision. Two things matter here:\n \n 1. **It is a real, runnable service.** `python recommendation_server.py` starts an\n    HTTP server on :8080 AND a background load thread that keeps calling\n@@ -22,14 +22,13 @@ from __future__ import annotations\n import json\n import os\n import threading\n-from collections import deque\n import time\n from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer\n \n # --- BAD (s4 planted leak): module-level unbounded accumulation ---\n # Every GetRecommendations call appends to this list and it is never bounded,\n # so the working set grows without limit under sustained load -> OOM.\n-_seen_product_ids: deque[str] = deque(maxlen=128)  # bounded: recent ids only\n+_seen_product_ids: list[str] = []\n \n CATALOG = [f\"PRODUCT-{i}\" for i in range(20)]\nShell cwd was reset to aiops-agentic-rl/AIops-agent",
+      "signal_types_covered": [
+        "git_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd workspace/recommendation 2>/dev/null && git log --oneline -1 --all --format='%H %s' HEAD && echo \"---current branch---\" && git branch --show-current && git status && echo \"---current file state---\" && grep -n \"_seen_product_ids\" recommendation_server.py",
+        "description": "Check current HEAD state and file content of recommendation_server.py"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "3f59f2767bae475917c795fad72398cb1a7f4f94 chore: update git-ai authorship notes\n---current branch---\nfix/bounded-seen-product-ids-oom-20260819\nOn branch fix/bounded-seen-product-ids-oom-20260819\nnothing to commit, working tree clean\n---current file state---\n21:_seen_product_ids: deque[str] = deque(maxlen=_SEEN_PRODUCT_IDS_MAXLEN)\n33:    _seen_product_ids.extend(input_product_ids)\n41:    return len(_seen_product_ids)\n87:    load generator needed). Each tick grows _seen_product_ids -> monotonic RSS rise.\nShell cwd was reset to aiops-agentic-rl/AIops-agent",
+      "signal_types_covered": [
+        "git_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs recommendation --tail 50 2>&1",
+        "description": "Check recommendation container logs"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "[recommendation] background load started ~400.0 rps\n[recommendation] serving on :9001 (leak revision)",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker restart recommendation",
+        "description": "Restart recommendation container as low-risk stopgap for memory leak"
+      },
+      "hook_decision": "allow",
+      "hook_action": "restart_instance",
+      "hook_target": "recommendation",
+      "observation": "recommendation",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "sleep 3; docker inspect recommendation --format 'RestartCount={{.RestartCount}} StartedAt={{.State.StartedAt}}'; docker stats --no-stream recommendation; docker logs recommendation --tail 10 2>&1",
+        "description": "Verify restart effect and current memory usage"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "RestartCount=0 StartedAt=2026-09-06T07:31:49.506871699Z\nCONTAINER ID   NAME             CPU %     MEM USAGE / LIMIT   MEM %     NET I/O       BLOCK I/O   PIDS\ne9fa862a0a43   recommendation   1.59%     10.89MiB / 1GiB     1.06%     586B / 126B   0B / 0B     2\n[recommendation] background load started ~400.0 rps\n[recommendation] serving on :9001 (leak revision)\n[recommendation] background load started ~400.0 rps\n[recommendation] serving on :9001 (leak revision)",
+      "signal_types_covered": [
+        "logs",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "recommendation 服务当前运行的容器镜像(recommendation-leak-fixture:test)是\"leak revision\"(docker logs 明确输出 \"serving on :9001 (leak revision)\")：recommendation_server.py 中模块级列表 _seen_product_ids 在每次 get_recommendations 调用时被无界 extend、从未裁剪(对应仓库中 commit f18f452 \"perf: track all seen product ids for analytics\" 把原先 baseline ac26792 的 deque(maxlen=128) 改成了无界 list)，持续 ~400rps 负载下工作集内存会单调增长直至 OOM。已确认工作区 workspace/recommendation 当前签出分支 fix/bounded-seen-product-ids-oom-20260819 上已经存在修复 commit 16837d0(把该列表改回 deque(maxlen=...) 限界)，但该修复尚未打入正在运行的容器镜像，故仍需代码/发布层面根治。已执行 docker restart recommendation 作为止血：重启前内存 18.29MiB，重启后 10.89MiB(RestartCount 计数在重启后归零，容器 StartedAt 更新为 07:31:49)，工作集已清零，但由于运行镜像仍是未限界的 leak revision，若不重新部署已存在的修复(16837d0)会再次单调增长直至 OOM。",
+        "kind": "deploy_regression",
+        "suspect_service": "recommendation",
+        "suspect_repo": "recommendation",
+        "suspect_commit_hint": "f18f452",
+        "suspect_file_hint": "recommendation_server.py",
+        "remediation_type": "online_op",
+        "also_code_fix": true,
+        "remediation_detail": "已自动执行低风险止血：`docker restart recommendation`（重启单实例）。效果：重启前 docker stats 显示 18.29MiB/1GiB(1.79%)，重启后降至 10.89MiB/1GiB(1.06%)，RestartCount 重置、StartedAt 更新为 2026-09-06T07:31:49Z，工作集内存已清零，属临时止血。根治需代码层面：recommendation_server.py 中 `_seen_product_ids` 应保持为限界结构（如 `deque(maxlen=N)`）而非无界 `list`，避免 get_recommendations 每次调用无界 extend。注意：workspace/recommendation 当前签出分支 fix/bounded-seen-product-ids-oom-20260819 上已存在修复 commit 16837d0(“fix: bound _seen_product_ids to stop unbounded memory growth”)，实现即是把该列表改回 deque(maxlen=...)；但正在运行的容器镜像 recommendation-leak-fixture:test 里跑的仍是未限界版本（docker logs 显示 \"(leak revision)\"），需要将该修复构建打入镜像并重新发布，否则本次重启只是临时缓解，负载持续下会再次单调增长直至 OOM。",
+        "confidence": 0.9,
+        "evidence": [
+          "docker ps: recommendation 容器镜像为 recommendation-leak-fixture:test",
+          "docker logs recommendation --tail 50: 明确输出 '[recommendation] serving on :9001 (leak revision)' 和 '[recommendation] background load started ~400.0 rps'，确认当前运行的是未限界(leak)版本且持续承受负载",
+          "deploys.log: 显示 recommendation 部署历史 baseline=ac26792 -> LATEST_DEPLOY(suspect)=f18f452（SHA 与告警文本中的 e482193/f8a6666 不一致，属历史工单模板复现文本，以实测 deploys.log 为准）",
+          "workspace/recommendation git diff ac26792 f18f452 -- recommendation_server.py: 显示 _seen_product_ids 从 'deque[str] = deque(maxlen=128)  # bounded: recent ids only' 改为无界 'list[str] = []'，注释标注 '# BAD (s4 planted leak): module-level unbounded accumulation'",
+          "workspace/recommendation git log --oneline: 显示后续修复 commit 16837d0 'fix: bound _seen_product_ids to stop unbounded memory growth'（当前签出分支 fix/bounded-seen-product-ids-oom-20260819），但该修复未打入正在运行的容器镜像",
+          "docker stats --no-stream recommendation（重启前）: MEM USAGE 18.29MiB/1GiB(1.79%)",
+          "已执行处置命令 `docker restart recommendation`；重启后 docker inspect 显示 StartedAt=2026-09-06T07:31:49.506871699Z、RestartCount=0，docker stats 显示 MEM USAGE 降至 10.89MiB/1GiB(1.06%)，确认止血生效"
+        ],
+        "time_window": {
+          "from": "2026-07-21T02:00:00Z",
+          "to": "2026-09-06T07:32:00Z"
+        }
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "logs",
+        "kubectl_status",
+        "git_history",
+        "rag_history"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ]
+}

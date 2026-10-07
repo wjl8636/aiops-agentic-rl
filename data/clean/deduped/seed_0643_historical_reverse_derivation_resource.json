@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "cart",
+  "labels": {
+    "service": "cart",
+    "severity": "critical",
+    "job": "cartservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0026-cart-resource",
+    "description": "cart 的一次运行时参数配置变更让会话合并逻辑的触发频率明显升高，CPU 使用率持续处于高位，没有伴随代码发版。"
+  },
+  "startsAt": "2026-07-22T03:30:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0026-cart-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

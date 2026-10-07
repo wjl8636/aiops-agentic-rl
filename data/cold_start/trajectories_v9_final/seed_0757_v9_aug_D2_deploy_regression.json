@@ -1,0 +1,183 @@
+{
+  "alert": {
+    "alertname": "TrendingNotUpdatingComplaint",
+    "service": "recommendation",
+    "labels": {
+      "service": "recommendation",
+      "severity": "warning",
+      "job": "recommendation"
+    },
+    "annotations": {
+      "summary": "运营反馈热门位轮换「失灵」：改了配置前台半天不变",
+      "description": "运营反馈推荐位的热门榜单「轮换失灵」：后台改了热门位配置，前台 /trending 半天过去还是旧榜单。无任何指标异常（服务健康、延迟正常、错误率 0），配置下发链路初步排查正常。开发怀疑服务端缓存没有按预期的 60s TTL 过期，已在预发复现「过了 TTL 仍返回旧值」。这是功能逻辑问题，需要改代码修复，请定位到具体代码。"
+    },
+    "startsAt": "2026-09-06T21:50:00Z",
+    "scenario_hint": "[v9增强/D2_用户报障] suspect_file=cache.py：客服/运营报障叙事（无指标异常），bug 在 master 的新文件里——验证「无指标信号时仍能正确定位代码根因判 code_fix，而不是误判成线上操作」"
+  },
+  "alert_id": "seed_0757_v9_aug_D2_deploy_regression",
+  "final_diagnosis": {
+    "summary": "recommendation 服务 /trending 热门位配置更新后半天不生效。根因是 337da52(trending cache rollout)引入的 TTLCache 单位 bug:cache.py 的 set() 用 time.time()(秒)加上 ttl_seconds*1000,把 60s TTL 放大成 60000 秒≈16.7 小时,导致缓存长时间不过期、前台一直返回旧榜单。指标健康、错误率 0 与现象吻合。纯代码逻辑回归,需改代码修复(去掉 *1000),不做线上处置。",
+    "kind": "deploy_regression",
+    "suspect_service": "recommendation",
+    "suspect_repo": "recommendation",
+    "suspect_commit_hint": "337da52",
+    "suspect_file_hint": "workspace/recommendation/cache.py (TTLCache.set)",
+    "remediation_type": "code_fix",
+    "remediation_detail": "修改 workspace/recommendation/cache.py 中 TTLCache.set():当前 `self._expires_at[key] = time.time() + ttl_seconds * 1000` 存在秒/毫秒单位错误——time.time() 已是秒,不应再乘 1000。应改为 `self._expires_at[key] = time.time() + ttl_seconds`,使 60s TTL 真正在 60 秒后过期,配置变更即可在一个 TTL 周期内被 /trending 感知。属纯代码修复,无需线上处置(重启只能临时清空内存缓存、约16.7h后必复发,不是真正修复,故未执行任何止血)。建议同时补一条断言过期时间量级的用例(test_cache.py)防回归。",
+    "confidence": 0.96,
+    "evidence": [
+      "代码直读(cache.py, workspace/recommendation): TTLCache.set() 内 `self._expires_at[key] = time.time() + ttl_seconds * 1000`;time.time() 单位为秒,再乘 1000 使 60s TTL 实际过期约 60000 秒≈16.7 小时,与告警'半天不变/过了 TTL 仍返回旧值'量级吻合",
+      "调用点(recommendation_server.py:90-95): /trending 命中缓存则直接返回 cached,未过期就不刷新;_TRENDING_TTL_SECONDS=60 传入 set(),被上面 *1000 放大",
+      "git: `git log -- cache.py` 与 `git show 337da52 --stat` 显示该文件由 commit 337da52 'feat: cache the trending list with a TTL'(deploys.log: 2026-09-05 trending cache rollout)引入,早于告警 startsAt 2026-09-06T21:50:00Z",
+      "告警 annotations 明确:服务健康、延迟正常、错误率 0、配置下发链路正常,已在预发复现'过了 TTL 仍返回旧值'——与'缓存过期逻辑 bug、非依赖/资源异常'一致",
+      "未执行任何处置:该问题为代码逻辑回归,重启仅临时清空内存 cache、约16.7h后必复发,非白名单止血能根治,故按规程不自动处置,交代码修复 Agent"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": null,
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"recommendation 服务 /trending 热门位配置更新后半天不生效。根因是 337da52(trending cache rollout)引入的 TTLCache 单位 bug:cache.py 的 set() 用 time.time()(秒)加上 ttl_seconds*1000,把 60s TTL 放大成 60000 秒≈16.7 小时,导致缓存长时间不过期、前台一直返回旧榜单。指标健康、错误率 0 与现象吻合。纯代码逻辑回归,需改代码修复(去掉 *1000),不做线上处置。\",\"kind\":\"deploy_regression\",\"suspect_service\":\"recommendation\",\"remediation_type\":\"code_fix\",\"remediation_detail\":\"修改 workspace/recommendation/cache.py 中 TTLCache.set():当前 `self._expires_at[key] = time.time() + ttl_seconds * 1000` 存在秒/毫秒单位错误——time.time() 已是秒,不应再乘 1000。应改为 `self._expires_at[key] = time.time() + ttl_seconds`,使 60s TTL 真正在 60 秒后过期,配置变更即可在一个 TTL 周期内被 /trending 感知。属纯代码修复,无需线上处置(重启只能临时清空内存缓存、约16.7h后必复发,不是真正修复,故未执行任何止血)。建议同时补一条断言过期时间量级的用例(test_cache.py)防回归。\",\"confidence\":0.96,\"suspect_repo\":\"recommendation\",\"suspect_commit_hint\":\"337da52\",\"suspect_file_hint\":\"workspace/recommendation/cache.py (TTLCache.set)\",\"also_code_fix\":false,\"evidence\":[\"代码直读(cache.py, workspace/recommendation): TTLCache.set() 内 `self._expires_at[key] = time.time() + ttl_seconds * 1000`;time.time() 单位为秒,再乘 1000 使 60s TTL 实际过期约 60000 秒≈16.7 小时,与告警'半天不变/过了 TTL 仍返回旧值'量级吻合\",\"调用点(recommendation_server.py:90-95): /trending 命中缓存则直接返回 cached,未过期就不刷新;_TRENDING_TTL_SECONDS=60 传入 set(),被上面 *1000 放大\",\"git: `git log -- cache.py` 与 `git show 337da52 --stat` 显示该文件由 commit 337da52 'feat: cache the trending list with a TTL'(deploys.log: 2026-09-05 trending cache rollout)引入,早于告警 startsAt 2026-09-06T21:50:00Z\",\"告警 annotations 明确:服务健康、延迟正常、错误率 0、配置下发链路正常,已在预发复现'过了 TTL 仍返回旧值'——与'缓存过期逻辑 bug、非依赖/资源异常'一致\",\"未执行任何处置:该问题为代码逻辑回归,重启仅临时清空内存 cache、约16.7h后必复发,非白名单止血能根治,故按规程不自动处置,交代码修复 Agent\"]}",
+    "teacher_model": "claude-4.8-opus-google",
+    "usage": {
+      "input_tokens": 2747,
+      "output_tokens": 3997,
+      "cache_creation_input_tokens": 18162,
+      "cache_read_input_tokens": 168283
+    },
+    "cost_usd": 0.31131400000000004,
+    "num_turns": 7,
+    "duration_ms": 78688,
+    "model_usage": {
+      "claude-4.8-opus-google": {
+        "inputTokens": 2747,
+        "outputTokens": 3997,
+        "cacheReadInputTokens": 168283,
+        "cacheCreationInputTokens": 18162,
+        "webSearchRequests": 0,
+        "costUSD": 0.31131400000000004,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000,
+        "canonicalModel": "claude-4.8-opus-google",
+        "provider": "firstParty"
+      }
+    },
+    "pruning": {
+      "steps_before": 6,
+      "steps_after": 6,
+      "removed": [],
+      "restored_by_verification": []
+    }
+  },
+  "steps": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "ls && echo \"---workspace---\" && ls workspace/ 2>/dev/null && echo \"---reco---\" && ls workspace/recommendation/ 2>/dev/null && echo \"---deploys---\" && cat deploys.log 2>/dev/null | tail -40",
+        "description": "List workspace and deploys log"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "agent\nAIOps-Agent-技术方案.md\nalerts\ndeploys.log\ndocker-compose.override.yml\ndocker-compose.yml\neval\nLICENSE\nREADME.md\nreports\nrequirements.txt\nscripts\ntests\nvendor\nworkspace\n授权条款.md\n---workspace---\nrecommendation\n---reco---\nBUGS.md\ncache.py\ndedupe.py\nDockerfile\npagination.py\npricing.py\nranking.py\nREADME.md\nrecommendation_server.py\nrequirements.txt\nstats.py\ntest_cache.py\ntest_dedupe.py\ntest_pagination.py\ntest_pricing.py\ntest_ranking.py\ntest_recommendation.py\ntest_stats.py\n---deploys---\n# service deploy history (image tag = git SHA)\n2026-08-31T04:00:49Z  recommendation  image=recommendation:f627b82  sha=f627b82  note=baseline\n2026-09-01T04:00:49Z  recommendation  image=recommendation:9d81a82  sha=9d81a82  note=popularity ranking rollout\n2026-09-02T04:00:49Z  recommendation  image=recommendation:f72ced8  sha=f72ced8  note=trending + dedupe rollout\n2026-09-03T04:00:49Z  recommendation  image=recommendation:327dda5  sha=327dda5  note=category hit stats rollout\n2026-09-04T04:00:49Z  recommendation  image=recommendation:bef6e91  sha=bef6e91  note=catalog pagination rollout\n2026-09-05T04:00:49Z  recommendation  image=recommendation:337da52  sha=337da52  note=trending cache rollout\n2026-09-06T04:00:49Z  recommendation  image=recommendation:a3f6812  sha=a3f6812  note=member pricing rollout\n2026-09-07T04:00:49Z  recommendation  image=recommendation:b0872d1  sha=b0872d1  note=LATEST_DEPLOY (suspect)",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps --format '{{.Names}}\\t{{.Image}}\\t{{.Status}}' 2>/dev/null | grep -i recomm",
+        "description": "Check recommendation container status/image"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "recommendation\tghcr.nju.edu.cn/open-telemetry/demo:latest-recommendation\tUp 4 minutes",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd workspace/recommendation && echo \"===cache.py===\" && cat cache.py && echo \"===git log cache.py===\" && git log --oneline -- cache.py 2>/dev/null | head",
+        "description": "Read cache.py and its git history"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "===cache.py===\n\"\"\"Tiny TTL cache for slowly-changing derived data (e.g. the trending list).\n\nEntries expire by time — unlike functools.lru_cache, which evicts by count —\nso a config change is picked up within `ttl_seconds` at the latest.\n\"\"\"\nfrom __future__ import annotations\n\nimport time\n\n\nclass TTLCache:\n    def __init__(self) -> None:\n        self._data: dict[str, object] = {}\n        self._expires_at: dict[str, float] = {}\n\n    def set(self, key: str, value: object, ttl_seconds: float) -> None:\n        self._data[key] = value\n        self._expires_at[key] = time.time() + ttl_seconds * 1000\n\n    def get(self, key: str):\n        exp = self._expires_at.get(key)\n        if exp is not None and time.time() < exp:\n            return self._data.get(key)\n        return None\n===git log cache.py===\n337da52 feat: cache the trending list with a TTL\nShell cwd was reset to /aiops-agentic-rl/AIops-agent",
+      "signal_types_covered": [
+        "git_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd workspace/recommendation && echo \"===git show 337da52===\" && git show 337da52 --stat && echo \"===usage===\" && rg -n \"TTLCache|\\.set\\(|ttl|trending\" recommendation_server.py | head -30",
+        "description": "Show suspect commit and cache usage"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "===git show 337da52===\ncommit 337da525e76eddc68dbb6c2c428832b85b31ea4f\nAuthor: aiops <aiops@example.com>\nDate:   Sat Sep 5 04:00:49 2026 +0000\n\n    feat: cache the trending list with a TTL\n    \n    The trending list is derived data; cache it for 60s so /trending stays cheap.\n\n cache.py                 | 24 ++++++++++++++++++++++++\n recommendation_server.py | 11 +++++++++++\n test_cache.py            | 20 ++++++++++++++++++++\n 3 files changed, 55 insertions(+)\n===usage===\n32:# merchandising-curated trending ids; may overlap with the catalog match set\n35:# the trending list is derived data; cache it briefly so /trending stays cheap\n37:_trending_cache = cache.TTLCache()\n58:    # merge the merchandising trending ids in; a response must never repeat an\n60:    trending = [p for p in _TRENDING if p not in exclude]\n61:    candidates = dedupe.dedupe_ids(candidates + trending)\n90:        elif self.path.startswith(\"/trending\"):\n91:            cached = _trending_cache.get(\"trending\")\n94:                _trending_cache.set(\"trending\", cached, _TRENDING_TTL_SECONDS)\n95:            self._json({\"trending\": cached})\nShell cwd was reset to /aiops-agentic-rl/AIops-agent",
+      "signal_types_covered": [
+        "git_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd workspace/recommendation && sed -n '30,100p' recommendation_server.py",
+        "description": "Read trending handler and TTL constant"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "CATALOG = [f\"PRODUCT-{i}\" for i in range(4)]\n\n# merchandising-curated trending ids; may overlap with the catalog match set\n_TRENDING = [\"PRODUCT-0\", \"PRODUCT-3\", \"PRODUCT-7\"]\n\n# the trending list is derived data; cache it briefly so /trending stays cheap\n_TRENDING_TTL_SECONDS = 60\n_trending_cache = cache.TTLCache()\n\n# request counter, exposed via /metrics\n_request_count = 0\n\ndef get_recommendations(input_product_ids: list[str], max_results: int = 5) -> list[str]:\n    \"\"\"Return up to max_results recommended product ids not already in the input.\"\"\"\n    global _request_count\n    _request_count += 1\n    # analytics: keep every served id so popularity can be computed later\n    _seen_product_ids.extend(input_product_ids)\n\n    stats.record_hit(\"catalog\")\n\n    exclude = set(input_product_ids)\n    candidates = [p for p in CATALOG if p not in exclude]\n\n    # popularity score: earlier catalog entries count as more popular\n    scored = [(p, float(len(CATALOG) - CATALOG.index(p))) for p in candidates]\n    candidates = ranking.rank_by_score(scored)\n\n    # merge the merchandising trending ids in; a response must never repeat an\n    # id, and never echo back an id the caller already has\n    trending = [p for p in _TRENDING if p not in exclude]\n    candidates = dedupe.dedupe_ids(candidates + trending)\n\n    return candidates[:max_results]\n\ndef seen_count() -> int:\n    \"\"\"Exposed for the regression test to assert the served-id history is bounded.\"\"\"\n    return len(_seen_product_ids)\n\n# --------------------------------------------------------------------------\n# Runnable service: HTTP endpoints + a self-driving background load thread.\n# This is what makes the service a LIVE, observable workload rather than a\n# static library. Imported as a module (by pytest) none of this runs.\n# --------------------------------------------------------------------------\n\nclass _Handler(BaseHTTPRequestHandler):\n    def do_GET(self):  # noqa: N802 (stdlib API)\n        if self.path.startswith(\"/recommend\"):\n            out = get_recommendations([\"PRODUCT-0\", \"PRODUCT-1\"])\n            self._json({\"recommendations\": out})\n        elif self.path.startswith(\"/catalog\"):\n            # path: /catalog/<page>/<page_size>  (page is 1-based)\n            parts = self.path.strip(\"/\").split(\"/\")\n            page = int(parts[1]) if len(parts) > 1 and parts[1] else 1\n            size = int(parts[2]) if len(parts) > 2 and parts[2] else 10\n            self._json({\n                \"page\": page,\n                \"page_size\": size,\n                \"products\": pagination.paginate(CATALOG, page, size),\n            })\n        elif self.path.startswith(\"/trending\"):\n            cached = _trending_cache.get(\"trending\")\n            if cached is None:\n                cached = list(_TRENDING)\n                _trending_cache.set(\"trending\", cached, _TRENDING_TTL_SECONDS)\n            self._json({\"trending\": cached})\n        elif self.path.startswith(\"/price/\"):\n            # path: /price/<product_id>/<discount_pct>\n            parts = self.path.strip(\"/\").split(\"/\")\n            product_id = parts[1] if len(parts) > 1 else \"\"\n            discount = int(parts[2]) if len(parts) > 2 else 10\nShell cwd was reset to /aiops-agentic-rl/AIops-agent",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "recommendation 服务 /trending 热门位配置更新后半天不生效。根因是 337da52(trending cache rollout)引入的 TTLCache 单位 bug:cache.py 的 set() 用 time.time()(秒)加上 ttl_seconds*1000,把 60s TTL 放大成 60000 秒≈16.7 小时,导致缓存长时间不过期、前台一直返回旧榜单。指标健康、错误率 0 与现象吻合。纯代码逻辑回归,需改代码修复(去掉 *1000),不做线上处置。",
+        "kind": "deploy_regression",
+        "suspect_service": "recommendation",
+        "remediation_type": "code_fix",
+        "remediation_detail": "修改 workspace/recommendation/cache.py 中 TTLCache.set():当前 `self._expires_at[key] = time.time() + ttl_seconds * 1000` 存在秒/毫秒单位错误——time.time() 已是秒,不应再乘 1000。应改为 `self._expires_at[key] = time.time() + ttl_seconds`,使 60s TTL 真正在 60 秒后过期,配置变更即可在一个 TTL 周期内被 /trending 感知。属纯代码修复,无需线上处置(重启只能临时清空内存缓存、约16.7h后必复发,不是真正修复,故未执行任何止血)。建议同时补一条断言过期时间量级的用例(test_cache.py)防回归。",
+        "confidence": 0.96,
+        "suspect_repo": "recommendation",
+        "suspect_commit_hint": "337da52",
+        "suspect_file_hint": "workspace/recommendation/cache.py (TTLCache.set)",
+        "also_code_fix": false,
+        "evidence": [
+          "代码直读(cache.py, workspace/recommendation): TTLCache.set() 内 `self._expires_at[key] = time.time() + ttl_seconds * 1000`;time.time() 单位为秒,再乘 1000 使 60s TTL 实际过期约 60000 秒≈16.7 小时,与告警'半天不变/过了 TTL 仍返回旧值'量级吻合",
+          "调用点(recommendation_server.py:90-95): /trending 命中缓存则直接返回 cached,未过期就不刷新;_TRENDING_TTL_SECONDS=60 传入 set(),被上面 *1000 放大",
+          "git: `git log -- cache.py` 与 `git show 337da52 --stat` 显示该文件由 commit 337da52 'feat: cache the trending list with a TTL'(deploys.log: 2026-09-05 trending cache rollout)引入,早于告警 startsAt 2026-09-06T21:50:00Z",
+          "告警 annotations 明确:服务健康、延迟正常、错误率 0、配置下发链路正常,已在预发复现'过了 TTL 仍返回旧值'——与'缓存过期逻辑 bug、非依赖/资源异常'一致",
+          "未执行任何处置:该问题为代码逻辑回归,重启仅临时清空内存 cache、约16.7h后必复发,非白名单止血能根治,故按规程不自动处置,交代码修复 Agent"
+        ]
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "logs",
+        "git_history"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "QuoteCalculationJitterInfo",
+  "service": "quote",
+  "labels": {
+    "service": "quote",
+    "severity": "info",
+    "job": "quoteservice"
+  },
+  "annotations": {
+    "summary": "quote 运费计算耗时出现 5% 以内的小幅抖动",
+    "description": "quote 服务运费计算耗时在过去 30 分钟出现 5% 以内的小幅抖动，触发了昨天刚调整过的info 级敏感阈值。抖动幅度在日常波动范围内，接口成功率与延迟 p99 均正常，下游无异常反馈。请确认这是阈值敏感度带来的噪声还是真实劣化的早期信号。"
+  },
+  "startsAt": "2026-09-07T10:45:00Z",
+  "scenario_hint": "[v9增强/B2_噪声info级] kind=config service=quote：不注入任何故障，info 级阈值敏感度叙事（A1 的姊妹型）——验证「查过→确认无异常→info_only」，与 B1 的「有故障但看不清」形成对照"
+}

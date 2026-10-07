@@ -1,0 +1,277 @@
+{
+  "alert": {
+    "alertname": "ShippingLatencyRegressionRumor",
+    "service": "shipping",
+    "labels": {
+      "service": "shipping",
+      "severity": "warning",
+      "job": "shippingservice"
+    },
+    "annotations": {
+      "summary": "有反馈称 shipping 今天早上发布新版本后下单变慢，怀疑发版回归",
+      "description": "运营群里有人反映\"shipping 组今天早上发布了一个新版本，发布后下单流程感觉变慢了\"，巡检脚本据此产生这条告警。查 deploys.log 全量记录，里面只有recommendation 服务的两条历史发布记录，完全没有 shipping 的任何发布记录；docker inspect shipping 显示容器创建时间是两周前，中间没有重建/重启过；docker stats 显示 shipping 容器 CPU/内存都在很低的正常水平；Prometheus 上shipping 服务的调用错误率、延迟都在历史基线范围内。怀疑\"今天发布\"这个说法本身是误传，没有对应的真实发布事件，也没有观测到延迟异常。"
+    },
+    "startsAt": "2026-09-01T12:00:00Z",
+    "scenario_hint": "[参数化扩增/pure_info_only] kind=deploy_regression service=shipping：deploys.log 里没有 shipping 的任何发布记录、容器也没有重建痕迹，服务当前真实健康，不注入任何故障：验证「所谓的发版回归本身是误传时应如实报info_only」这一场景，覆盖 deploy_regression 这个 kind"
+  },
+  "alert_id": "seed_0707_parametrized_deploy_regression",
+  "final_diagnosis": {
+    "summary": "经核实，\"shipping 今天早上发版导致下单变慢\"为误传，无对应真实事件，未观测到性能异常。deploys.log 全量发版记录中不含 shipping 的任何条目(仅有 2026-07-05 的 recommendation 两条记录，与\"今天早上\"完全不符)；docker inspect 显示 shipping 容器创建于 2026-08-18(两周前)，RestartCount=0，期间未发生任何重建/重启，与\"刚发布新版本\"矛盾；docker stats 显示 CPU 0%、内存仅 2.7MiB/20MiB(13.6%)，资源占用正常；Prometheus 上 traces_span_metrics_calls_total{service_name=\"shipping\",status_code=\"STATUS_CODE_ERROR\"} 查询结果为空(无错误调用)，24h increase 的错误调用数也为 0；未发现延迟或错误率偏离基线的证据。Jaeger 中 shipping 服务存在于服务列表，但近期窗口无可用 trace 样本(该环境整体调用量很低，非异常信号)。综合判断：这是一条基于运营群传言、未经证实的误报告警，没有真实发布事件，也没有观测到性能回归，无需任何线上处置或代码修复。",
+    "kind": "deploy_regression",
+    "suspect_service": "shipping",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "info_only",
+    "remediation_detail": "无需任何处置。建议：(1) 在运营群澄清\"shipping 今天发版\"的说法为误传，未查到对应发布记录；(2) 若巡检脚本会依据群聊/工单文本自动生成告警，建议后续对这类\"传言型\"告警增加\"是否有对应 deploys.log 记录\"作为前置校验，减少误报；(3) 保持观察，若后续确有真实发版或指标异常再重新评估。",
+    "confidence": 0.85,
+    "evidence": [
+      "deploys.log 全量内容仅含2条 2026-07-05T05:23:38Z 的 recommendation 发版记录(ac26792→f18f452)，不含任何 shipping 记录",
+      "docker inspect shipping: Created=2026-08-18T08:02:59Z, RestartCount=0, OOMKilled=false, StartedAt=2026-08-18T08:02:59Z — 两周内无重建/重启，与'今天发布新版本'矛盾",
+      "docker stats shipping: CPU 0.00%, MEM 2.723MiB/20MiB(13.61%) — 资源占用正常，非过载表现",
+      "PromQL sum(rate(traces_span_metrics_calls_total{service_name=\"shipping\",status_code=\"STATUS_CODE_ERROR\"}[15m])) 结果为空(无错误)；sum(increase(...[24h])) 同样为空/0，24h 内无错误调用",
+      "PromQL histogram_quantile(0.99, sum(rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"shipping\"}[15m])) by (le)) 及 24h increase 均为 NaN/0，因该环境调用量极低，未见异常延迟信号，与告警描述的 Prometheus 结论一致",
+      "curl http://localhost:16686/jaeger/ui/api/services 确认 shipping 服务已注册在 Jaeger 中，但 lookback=1h/6h/24h 查询 traces 均返回 total=0，环境整体为低流量demo，未见异常trace证据，也不构成反证"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "info_only",
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"经核实，\\\"shipping 今天早上发版导致下单变慢\\\"为误传，无对应真实事件，未观测到性能异常。deploys.log 全量发版记录中不含 shipping 的任何条目(仅有 2026-07-05 的 recommendation 两条记录，与\\\"今天早上\\\"完全不符)；docker inspect 显示 shipping 容器创建于 2026-08-18(两周前)，RestartCount=0，期间未发生任何重建/重启，与\\\"刚发布新版本\\\"矛盾；docker stats 显示 CPU 0%、内存仅 2.7MiB/20MiB(13.6%)，资源占用正常；Prometheus 上 traces_span_metrics_calls_total{service_name=\\\"shipping\\\",status_code=\\\"STATUS_CODE_ERROR\\\"} 查询结果为空(无错误调用)，24h increase 的错误调用数也为 0；未发现延迟或错误率偏离基线的证据。Jaeger 中 shipping 服务存在于服务列表，但近期窗口无可用 trace 样本(该环境整体调用量很低，非异常信号)。综合判断：这是一条基于运营群传言、未经证实的误报告警，没有真实发布事件，也没有观测到性能回归，无需任何线上处置或代码修复。\",\"kind\":\"deploy_regression\",\"suspect_service\":\"shipping\",\"suspect_repo\":null,\"suspect_commit_hint\":null,\"suspect_file_hint\":null,\"remediation_type\":\"info_only\",\"remediation_detail\":\"无需任何处置。建议：(1) 在运营群澄清\\\"shipping 今天发版\\\"的说法为误传，未查到对应发布记录；(2) 若巡检脚本会依据群聊/工单文本自动生成告警，建议后续对这类\\\"传言型\\\"告警增加\\\"是否有对应 deploys.log 记录\\\"作为前置校验，减少误报；(3) 保持观察，若后续确有真实发版或指标异常再重新评估。\",\"confidence\":0.85,\"evidence\":[\"deploys.log 全量内容仅含2条 2026-07-05T05:23:38Z 的 recommendation 发版记录(ac26792→f18f452)，不含任何 shipping 记录\",\"docker inspect shipping: Created=2026-08-18T08:02:59Z, RestartCount=0, OOMKilled=false, StartedAt=2026-08-18T08:02:59Z — 两周内无重建/重启，与'今天发布新版本'矛盾\",\"docker stats shipping: CPU 0.00%, MEM 2.723MiB/20MiB(13.61%) — 资源占用正常，非过载表现\",\"PromQL sum(rate(traces_span_metrics_calls_total{service_name=\\\"shipping\\\",status_code=\\\"STATUS_CODE_ERROR\\\"}[15m])) 结果为空(无错误)；sum(increase(...[24h])) 同样为空/0，24h 内无错误调用\",\"PromQL histogram_quantile(0.99, sum(rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\\\"shipping\\\"}[15m])) by (le)) 及 24h increase 均为 NaN/0，因该环境调用量极低，未见异常延迟信号，与告警描述的 Prometheus 结论一致\",\"curl http://localhost:16686/jaeger/ui/api/services 确认 shipping 服务已注册在 Jaeger 中，但 lookback=1h/6h/24h 查询 traces 均返回 total=0，环境整体为低流量demo，未见异常trace证据，也不构成反证\"],\"also_code_fix\":false}",
+    "pruning": {
+      "steps_before": 14,
+      "steps_after": 13,
+      "removed": [
+        {
+          "step_index_1based": 3,
+          "tool_name": "Bash",
+          "reason": "skeleton-repeat:docker-status:shipping",
+          "command_snippet": "docker stats --no-stream --filter \"name=shipping\" 2>/dev/null"
+        }
+      ],
+      "restored_by_verification": []
+    }
+  },
+  "steps": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== deploys.log ===\"; cat deploys.log 2>/dev/null || find . -maxdepth 3 -iname \"deploys.log\" 2>/dev/null",
+        "description": "查看 deploys.log 全量发版记录"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== deploys.log ===\n# service deploy history (image tag = git SHA)\n2026-07-05T05:23:38Z  recommendation  image=recommendation:ac26792  sha=ac26792  note=baseline\n2026-07-05T05:23:38Z  recommendation  image=recommendation:f18f452  sha=f18f452  note=LATEST_DEPLOY (suspect)",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps --filter \"name=shipping\" --format '{{.Names}}\\t{{.Status}}\\t{{.CreatedAt}}'; echo \"---inspect---\"; docker inspect --format '{{.Created}} RestartCount={{.RestartCount}} OOMKilled={{.State.OOMKilled}} StartedAt={{.State.StartedAt}}' shipping 2>/dev/null || docker inspect --format '{{.Created}} RestartCount={{.RestartCount}} OOMKilled={{.State.OOMKilled}} StartedAt={{.State.StartedAt}}' $(docker ps -a --filter \"name=shipping\" -q)",
+        "description": "检查 shipping 容器创建时间与重启记录"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "shipping\tUp 2 weeks\t2026-08-18 16:02:59 +0800 CST\n---inspect---\n2026-08-18T08:02:59.103336067Z RestartCount=0 OOMKilled=false StartedAt=2026-08-18T08:02:59.316473573Z",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps -a --format '{{.Names}}' | grep -i ship; echo \"---\"; docker stats --no-stream shipping 2>&1",
+        "description": "获取shipping容器名并查看资源占用"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "shipping\n---\nCONTAINER ID   NAME       CPU %     MEM USAGE / LIMIT   MEM %     NET I/O         BLOCK I/O     PIDS\nc86cb4b1eaf5   shipping   0.00%     2.723MiB / 20MiB    13.61%    494kB / 400kB   1.12MB / 0B   7",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -G 'http://localhost:9090/api/v1/query' --data-urlencode 'query={service_name=\"shipping\"}' | python3 -c \"import sys,json; d=json.load(sys.stdin); print(len(d.get('data',{}).get('result',[]))); names=set(r['metric'].get('__name__') for r in d.get('data',{}).get('result',[])); print(names)\"",
+        "description": "查询shipping服务当前暴露的指标名"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "60\n{'traces_span_metrics_duration_milliseconds_count', 'traces_span_metrics_calls_total', 'traces_span_metrics_duration_milliseconds_sum', 'traces_span_metrics_duration_milliseconds_bucket'}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== error rate ===\"; curl -s -G 'http://localhost:9090/api/v1/query' --data-urlencode 'query=sum(rate(traces_span_metrics_calls_total{service_name=\"shipping\",status_code=\"STATUS_CODE_ERROR\"}[15m]))' | python3 -m json.tool\necho \"=== total calls rate ===\"; curl -s -G 'http://localhost:9090/api/v1/query' --data-urlencode 'query=sum(rate(traces_span_metrics_calls_total{service_name=\"shipping\"}[15m]))' | python3 -m json.tool\necho \"=== p99 latency (ms) ===\"; curl -s -G 'http://localhost:9090/api/v1/query' --data-urlencode 'query=histogram_quantile(0.99, sum(rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"shipping\"}[15m])) by (le))' | python3 -m json.tool",
+        "description": "查询shipping当前错误率与p99延迟"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== error rate ===\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": []\n    }\n}\n=== total calls rate ===\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {},\n                \"value\": [\n                    1788697804.294,\n                    \"0\"\n                ]\n            }\n        ]\n    }\n}\n=== p99 latency (ms) ===\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {},\n                \"value\": [\n                    1788697804.335,\n                    \"NaN\"\n                ]\n            }\n        ]\n    }\n}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -G 'http://localhost:9090/api/v1/query_range' --data-urlencode 'query=histogram_quantile(0.99, sum(rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"shipping\"}[15m])) by (le))' --data-urlencode 'start='$(date -u -v-6H +%Y-%m-%dT%H:%M:%SZ) --data-urlencode 'end='$(date -u +%Y-%m-%dT%H:%M:%SZ) --data-urlencode 'step=600' | python3 -c \"\nimport sys,json\nd=json.load(sys.stdin)\nfor r in d.get('data',{}).get('result',[]):\n    for v in r['values']:\n        print(v)\n\"",
+        "description": "查询过去6小时shipping p99延迟趋势"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "[1788682206, 'NaN']\n[1788682806, 'NaN']\n[1788683406, 'NaN']\n[1788684006, 'NaN']\n[1788684606, 'NaN']\n[1788685206, 'NaN']\n[1788685806, 'NaN']\n[1788686406, 'NaN']\n[1788687006, 'NaN']\n[1788687606, 'NaN']\n[1788688206, 'NaN']\n[1788688806, 'NaN']\n[1788689406, 'NaN']\n[1788690006, 'NaN']\n[1788690606, 'NaN']\n[1788691206, 'NaN']\n[1788691806, 'NaN']\n[1788692406, 'NaN']\n[1788693006, 'NaN']\n[1788693606, 'NaN']\n[1788694206, 'NaN']\n[1788694806, 'NaN']\n[1788695406, 'NaN']\n[1788696006, 'NaN']\n[1788696606, 'NaN']\n[1788697206, 'NaN']\n[1788697806, 'NaN']",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== calls rate last 1h ===\"; curl -s -G 'http://localhost:9090/api/v1/query' --data-urlencode 'query=sum(rate(traces_span_metrics_calls_total{service_name=\"shipping\"}[1h]))' | python3 -m json.tool\necho \"=== last known sample time for shipping metric ===\"; curl -s -G 'http://localhost:9090/api/v1/query' --data-urlencode 'query=traces_span_metrics_calls_total{service_name=\"shipping\"}' | python3 -c \"\nimport sys,json\nd=json.load(sys.stdin)\nfor r in d.get('data',{}).get('result',[])[:5]:\n    print(r['metric'], r['value'])\n\"",
+        "description": "检查shipping调用速率与最近样本"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== calls rate last 1h ===\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {},\n                \"value\": [\n                    1788697814.978,\n                    \"0\"\n                ]\n            }\n        ]\n    }\n}\n=== last known sample time for shipping metric ===\n{'__name__': 'traces_span_metrics_calls_total', 'job': 'opentelemetry-demo/shipping', 'service_name': 'shipping', 'service_namespace': 'opentelemetry-demo', 'span_kind': 'SPAN_KIND_SERVER', 'span_name': 'oteldemo.ShippingService/GetQuote', 'status_code': 'STATUS_CODE_UNSET'} [1788697815.105, '13']\n{'__name__': 'traces_span_metrics_calls_total', 'job': 'opentelemetry-demo/shipping', 'service_name': 'shipping', 'service_namespace': 'opentelemetry-demo', 'span_kind': 'SPAN_KIND_CLIENT', 'span_name': 'POST', 'status_code': 'STATUS_CODE_UNSET'} [1788697815.105, '13']\n{'__name__': 'traces_span_metrics_calls_total', 'job': 'opentelemetry-demo/shipping', 'service_name': 'shipping', 'service_namespace': 'opentelemetry-demo', 'span_kind': 'SPAN_KIND_SERVER', 'span_name': 'oteldemo.ShippingService/ShipOrder', 'status_code': 'STATUS_CODE_UNSET'} [1788697815.105, '11']",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s 'http://localhost:16686/jaeger/ui/api/traces?service=shipping&lookback=6h&limit=20' | python3 -c \"\nimport sys,json\nd=json.load(sys.stdin)\ntraces=d.get('data',[])\nprint('trace count:', len(traces))\nfor t in traces[:10]:\n    spans=t.get('spans',[])\n    durs=[s['duration'] for s in spans if s.get('operationName')]\n    print(t.get('traceID'), 'spans=',len(spans), 'maxdur_us=', max(durs) if durs else None)\n\"",
+        "description": "查看shipping最近trace延迟情况"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "trace count: 0",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s 'http://localhost:16686/jaeger/ui/api/services' | python3 -m json.tool",
+        "description": "列出Jaeger中的服务名"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\n    \"data\": [\n        \"email\",\n        \"accounting\",\n        \"fraud-detection\",\n        \"quote\",\n        \"recommendation\",\n        \"jaeger-all-in-one\",\n        \"frontend\",\n        \"load-generator\",\n        \"flagd\",\n        \"cart\",\n        \"ad\",\n        \"checkout\",\n        \"shipping\",\n        \"payment\",\n        \"product-catalog\",\n        \"currency\"\n    ],\n    \"total\": 16,\n    \"limit\": 0,\n    \"offset\": 0,\n    \"errors\": null\n}",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s 'http://localhost:16686/jaeger/ui/api/traces?service=shipping&lookback=1h&limit=20' | python3 -m json.tool | head -50",
+        "description": "重试Jaeger查询shipping traces"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\n    \"data\": [],\n    \"total\": 0,\n    \"limit\": 0,\n    \"offset\": 0,\n    \"errors\": null\n}",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s 'http://localhost:16686/jaeger/ui/api/traces?service=shipping&lookback=24h&limit=20' | python3 -m json.tool | head -80",
+        "description": "用24小时lookback重试Jaeger查询"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\n    \"data\": [],\n    \"total\": 0,\n    \"limit\": 0,\n    \"offset\": 0,\n    \"errors\": null\n}",
+      "signal_types_covered": [
+        "jaeger"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== 24h avg latency shipping GetQuote (ms) ===\"\ncurl -s -G 'http://localhost:9090/api/v1/query' --data-urlencode 'query=sum(increase(traces_span_metrics_duration_milliseconds_sum{service_name=\"shipping\",span_kind=\"SPAN_KIND_SERVER\"}[24h])) / sum(increase(traces_span_metrics_duration_milliseconds_count{service_name=\"shipping\",span_kind=\"SPAN_KIND_SERVER\"}[24h]))' | python3 -m json.tool\necho \"=== total calls last 24h ===\"\ncurl -s -G 'http://localhost:9090/api/v1/query' --data-urlencode 'query=sum(increase(traces_span_metrics_calls_total{service_name=\"shipping\",span_kind=\"SPAN_KIND_SERVER\"}[24h]))' | python3 -m json.tool\necho \"=== error calls last 24h ===\"\ncurl -s -G 'http://localhost:9090/api/v1/query' --data-urlencode 'query=sum(increase(traces_span_metrics_calls_total{service_name=\"shipping\",status_code=\"STATUS_CODE_ERROR\"}[24h]))' | python3 -m json.tool",
+        "description": "用increase()在24h窗口查看shipping延迟与错误情况(应对低流量场景)"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== 24h avg latency shipping GetQuote (ms) ===\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {},\n                \"value\": [\n                    1788697850.01,\n                    \"NaN\"\n                ]\n            }\n        ]\n    }\n}\n=== total calls last 24h ===\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": [\n            {\n                \"metric\": {},\n                \"value\": [\n                    1788697850.067,\n                    \"0\"\n                ]\n            }\n        ]\n    }\n}\n=== error calls last 24h ===\n{\n    \"status\": \"success\",\n    \"data\": {\n        \"resultType\": \"vector\",\n        \"result\": []\n    }\n}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "经核实，\"shipping 今天早上发版导致下单变慢\"为误传，无对应真实事件，未观测到性能异常。deploys.log 全量发版记录中不含 shipping 的任何条目(仅有 2026-07-05 的 recommendation 两条记录，与\"今天早上\"完全不符)；docker inspect 显示 shipping 容器创建于 2026-08-18(两周前)，RestartCount=0，期间未发生任何重建/重启，与\"刚发布新版本\"矛盾；docker stats 显示 CPU 0%、内存仅 2.7MiB/20MiB(13.6%)，资源占用正常；Prometheus 上 traces_span_metrics_calls_total{service_name=\"shipping\",status_code=\"STATUS_CODE_ERROR\"} 查询结果为空(无错误调用)，24h increase 的错误调用数也为 0；未发现延迟或错误率偏离基线的证据。Jaeger 中 shipping 服务存在于服务列表，但近期窗口无可用 trace 样本(该环境整体调用量很低，非异常信号)。综合判断：这是一条基于运营群传言、未经证实的误报告警，没有真实发布事件，也没有观测到性能回归，无需任何线上处置或代码修复。",
+        "kind": "deploy_regression",
+        "suspect_service": "shipping",
+        "suspect_repo": null,
+        "suspect_commit_hint": null,
+        "suspect_file_hint": null,
+        "remediation_type": "info_only",
+        "remediation_detail": "无需任何处置。建议：(1) 在运营群澄清\"shipping 今天发版\"的说法为误传，未查到对应发布记录；(2) 若巡检脚本会依据群聊/工单文本自动生成告警，建议后续对这类\"传言型\"告警增加\"是否有对应 deploys.log 记录\"作为前置校验，减少误报；(3) 保持观察，若后续确有真实发版或指标异常再重新评估。",
+        "confidence": 0.85,
+        "evidence": [
+          "deploys.log 全量内容仅含2条 2026-07-05T05:23:38Z 的 recommendation 发版记录(ac26792→f18f452)，不含任何 shipping 记录",
+          "docker inspect shipping: Created=2026-08-18T08:02:59Z, RestartCount=0, OOMKilled=false, StartedAt=2026-08-18T08:02:59Z — 两周内无重建/重启，与'今天发布新版本'矛盾",
+          "docker stats shipping: CPU 0.00%, MEM 2.723MiB/20MiB(13.61%) — 资源占用正常，非过载表现",
+          "PromQL sum(rate(traces_span_metrics_calls_total{service_name=\"shipping\",status_code=\"STATUS_CODE_ERROR\"}[15m])) 结果为空(无错误)；sum(increase(...[24h])) 同样为空/0，24h 内无错误调用",
+          "PromQL histogram_quantile(0.99, sum(rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"shipping\"}[15m])) by (le)) 及 24h increase 均为 NaN/0，因该环境调用量极低，未见异常延迟信号，与告警描述的 Prometheus 结论一致",
+          "curl http://localhost:16686/jaeger/ui/api/services 确认 shipping 服务已注册在 Jaeger 中，但 lookback=1h/6h/24h 查询 traces 均返回 total=0，环境整体为低流量demo，未见异常trace证据，也不构成反证"
+        ],
+        "also_code_fix": false
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "prometheus",
+        "jaeger",
+        "logs",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ]
+}

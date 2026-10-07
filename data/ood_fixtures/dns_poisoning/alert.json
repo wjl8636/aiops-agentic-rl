@@ -1,0 +1,15 @@
+{
+  "alertname": "DnsResolutionMismatch",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 解析 product-catalog 域名得到异常 IP，请求全部连不上或连到错误的对端",
+    "description": "recommendation 调用 product-catalog 时，容器内 DNS 解析出的 IP 与 k8s Service/DNS 记录预期的 IP 不一致（部分请求解析到一个不属于 product-catalog Endpoints 的地址，另一部分解析到一个完全打不通的地址），导致 GetProduct 调用大量连接超时或直接被拒绝。同一时间集群里其他服务的 DNS 解析看起来正常，问题集中在 recommendation 所在节点/命名空间对 product-catalog 这一条记录的解析结果上。没有代码发版，没有 Service/Endpoints 变更记录，指标层面 product-catalog 自身健康、CPU/内存/QPS 都正常，问题不在被调用方而在调用方这一侧的名字解析结果。"
+  },
+  "startsAt": "2026-08-26T14:00:00Z",
+  "scenario_hint": "OOD/DNS 污染：不在现有 4 类 Kind 枚举里的新故障类型，这里借用 kind=\"dependency\" 近似表达（表现上仍是一次调用失败），但真实根因在网络/名字解析层而不是被调用服务本身的代码或资源问题——设计张力见 data/ood_fixtures/dns_poisoning/README.md。"
+}

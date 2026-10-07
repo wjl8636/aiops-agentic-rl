@@ -1,0 +1,15 @@
+{
+  "alertname": "RecommendationLatencyP95SlightlyElevated",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "info",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 服务 p95 延迟出现小幅波动，尚未确认是否为真实异常",
+    "description": "监控规则捕捉到 recommendation 服务过去 15 分钟 p95 延迟比前一小时基线略高（触发的是最低档 info 级提示，不是 warning/critical）。当前活环境里没有对recommendation 做任何故障注入或变更——docker stats 显示 CPU/内存/重启次数完全正常，Prometheus 上该服务的错误率为 0、p95/p99 延迟处于历史基线区间内的正常抖动范围，flagd 相关开关（recommendationCacheFailure 等）均为 off，deploys.log 里近 24 小时没有该服务的发版记录，Jaeger 里最近的调用链也没有异常 span。这条提示更像是监控阈值敏感度带来的噪声，而不是真实故障。"
+  },
+  "startsAt": "2026-07-05T09:30:00Z",
+  "scenario_hint": "[参数化扩增/pure_info_only] 服务当前真实健康，不注入任何故障：验证「证据不足/确实无异常时应如实报 info_only」这一诊断标签的空白场景"
+}

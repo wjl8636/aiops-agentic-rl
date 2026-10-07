@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "warning",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0047-kafka-resource",
+    "description": "告警声称 orders topic 消费 lag 单调上升（flagd kafkaQueueProblems 触发，生产快于消费）。实时核验与该描述不符：kafka_consumer_records_lag{topic=\"orders\"} 在过去1小时(60个采样点，2026-08-18 ~11:26-12:26)恒为0；kafka_lag_max=0；fraud-detection消费者kafka_consumer_last_poll_seconds_ago=0（健康，正在轮询）；生产速率rate(kafka_message_count_total[5m])≈0.198 msg/s，consumed_total速率瞬时为0但属低流量下的正常抖动，无持续偏离；broker侧kafka_purgatory_size{type=Produce}=0、kafka_request_queue=0，Fetch purgatory=269属长轮询正常水位，无堵塞迹象。flagd静态配置vendor/otel-demo/src/flagd/demo.flagd.json中kafkaQueueProblems的defaultVariant确为\"on\"(100%)，故障注入名义上已启用，但当前低流量场景下未表现出实际积压。同时告警startsAt=2026-06-20T10:10:00Z，与当前kafka/fraud-detection/accounting/checkout容器实际启动时间(2026-08-18T08:02:59~08:03:09Z，即Up约4小时)相差近两个月，时间线不吻合，且历史检索到5条高度相似(相似度0.71~0.75)的既往工单均判定为\"陈旧/未在当前生命周期产生实际影响\"的失效告警，走向均为feishu_low_confidence。综合判断：当前不存在正在发生的真实队列积压，本次告警很可能是陈旧/复现测试告警。未执行任何自动处置——证据不支持存在需要止血的实际问题，也不满足自动处置的前提；此外即便未来坐实积压，kafka broker本身是有状态组件、真正需要扩容的消费者fraud-detection/accounting均不在低风险自动处置授权目标清单(ad, cart, checkout, currency, email, frontend, payment, quote, recommendation, shipping)内，扩容/重启动作也无法自动执行。"
+  },
+  "startsAt": "2026-07-20T09:30:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0047-kafka-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

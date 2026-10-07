@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "shipping",
+  "labels": {
+    "service": "shipping",
+    "severity": "critical",
+    "job": "shippingservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0002-shipping-dependency",
+    "description": "shipping 同步调用 quote 服务计算运费，这次调用没有配超时；quote 服务当时正遭遇局部限流，shipping 的请求处理线程逐个卡死在等待运费报价上，shipping 接口对上游 checkout 出现级联超时。"
+  },
+  "startsAt": "2026-07-21T02:45:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0002-shipping-dependency：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

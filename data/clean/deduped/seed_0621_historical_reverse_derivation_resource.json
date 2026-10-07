@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "currency",
+  "labels": {
+    "service": "currency",
+    "severity": "warning",
+    "job": "currencyservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0017-currency-resource",
+    "description": "currency 的汇率缓存刷新间隔被一次配置变更误设成了远小于原值的数字，导致服务陷入接近死循环式的高频轮询拉取汇率，CPU 使用率持续处于高位，没有伴随代码发版。"
+  },
+  "startsAt": "2026-07-21T11:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0017-currency-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

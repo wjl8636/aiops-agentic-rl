@@ -1,0 +1,15 @@
+{
+  "alertname": "AdManualGcPauses",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "ad 服务被触发手动完整 GC，请求出现周期性停顿",
+    "description": "ad 服务被强制触发完整的手动 GC（adManualGc 开关被打开），GC 期间请求处理出现明显停顿，延迟曲线上呈现周期性毛刺。与持续型高 CPU 不同，这里的表现是周期性停顿而非持续打满。ad 容器资源指标整体正常，无发版。请定位确认后给出处置建议。"
+  },
+  "startsAt": "2026-09-04T21:30:00Z",
+  "scenario_hint": "[v9增强/C1_早收敛] flag=adManualGc：单 flag、单服务、证据链清晰——验证「Skill → OFREP 查 flag → 1-2 步旁证 → 收敛，总步数 ≤8」的效率目标行为"
+}

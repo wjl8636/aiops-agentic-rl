@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "warning",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0045-kafka-resource",
+    "description": "告警声称 orders topic Kafka 消费 lag 单调上升（生产快于消费），但实时核验与该结论矛盾：当前环境 kafka/fraud-detection/accounting/checkout 容器确实在运行（非历史工单中\"未部署\"的情况），flagd 配置中 kafkaQueueProblems 的 defaultVariant 也确为 \"on\"（故障注入名义上已开启）；但 Prometheus 显示 kafka_consumer_records_lag{topic=\"orders\"}、kafka_lag_max 在整个可观测窗口（容器生命周期 20 分钟）内恒为 0，Produce 侧 purgatory 恒为 0，Fetch 侧 purgatory 只是正常波动无上升趋势；kafka_message_count_total 呈线性平稳增长（~12.5 msg/min），并非\"生产远超消费\"的尖峰。同时告警 startsAt=2026-06-20 与当前容器实际启动时间 2026-08-18T08:03 相差近两个月，时间线不吻合。综合判断：当前不存在正在发生的真实队列积压，告警很可能是过时/未真正命中当前实例生命周期的失效告警（或故障注入尚未在低流量下产生可观测效应）。accounting 消费者报\"Unknown topic or partition\"是话题可用性问题，与积压无关，且它甚至没有上报 lag 指标。证据不足以坐实\"正在积压\"，不满足自动处置的前提条件；即便坐实，kafka 为有状态组件、真正需扩容的消费者 accounting/fraud-detection 也不在低风险自动处置授权清单内，故未执行任何处置。"
+  },
+  "startsAt": "2026-07-21T07:15:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0045-kafka-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

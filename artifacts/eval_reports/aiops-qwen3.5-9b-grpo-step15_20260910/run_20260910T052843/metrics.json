@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-09-10T05:55:14+00:00",
+  "commit": "51202883c7a6c3dccbfc5d6c5f50a56aafab2302",
+  "sources": [
+    "reports/aiops-qwen3.5-9b-grpo-step15_20260910/run_20260910T052843/multi_run_20260910T052843.jsonl"
+  ],
+  "rows": 10,
+  "scenarios_total": 4,
+  "runs_per_scenario_avg": 2.5,
+  "effectiveness": {
+    "service_accuracy": 1.0,
+    "kind_accuracy": 0.8,
+    "route_accuracy": 0.7,
+    "fix_success_rate": 1.0,
+    "code_location_accuracy": null,
+    "mttr_seconds_p50": 87.194,
+    "mttr_minutes_p50": 1.453,
+    "pr_submission_rate": 1.0
+  },
+  "denominators": {
+    "service_accuracy": 10,
+    "kind_accuracy": 10,
+    "route_accuracy": 10,
+    "fix_success_rate": 1,
+    "code_location_accuracy": 0,
+    "mttr_p50": 9,
+    "pr_submission_rate": 1
+  },
+  "per_scenario_runs": {
+    "s_lowconf": 3,
+    "s6_info": 3,
+    "s9_adv": 3,
+    "s5_dup": 1
+  },
+  "baseline_reference": {
+    "human_mttr_minutes_low": 30,
+    "human_mttr_minutes_high": 60,
+    "source": "Google SRE Book / DORA Report 行业中位数",
+    "note": "引用行业公开均值做对照，非本项目内做过的人工对照实验。"
+  }
+}

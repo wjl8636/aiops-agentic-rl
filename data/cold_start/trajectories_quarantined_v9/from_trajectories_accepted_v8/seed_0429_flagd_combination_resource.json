@@ -1,0 +1,161 @@
+{
+  "alert": {
+    "alertname": "FlagdMechanicalCombo_kafkaQueueProblems_cartFailure",
+    "service": "kafka",
+    "labels": {
+      "service": "kafka",
+      "severity": "critical",
+      "job": "kafka"
+    },
+    "annotations": {
+      "summary": "cart/kafka 同时命中 2 个 flagd 故障开关",
+      "description": "同一时间窗口内命中 2 个 flagd 故障开关：kafkaQueueProblems（同时压高 Kafka 生产速率并给消费者引入延迟，制造 lag 尖峰）；cartFailure（cart 服务失败）。涉及服务：cart、kafka。这条组合来自对 CONFIRMED_FLAGD_FLAGS 做 itertools.combinations(r=2) 的机械遍历，过滤掉同服务互斥/过量 hard-down 组合后剩下的候选，用来扩大 flagd_combination 路径的组合多样性，不是手写的定制叙事。"
+    },
+    "startsAt": "2026-07-11T18:48:00Z",
+    "scenario_hint": "[flagd组合/多点] flags=kafkaQueueProblems+cartFailure：多个 flagd 故障开关同时注入构造的复合 resource 场景"
+  },
+  "alert_id": "seed_0429_flagd_combination_resource",
+  "steps": [
+    {
+      "tool_name": "Skill",
+      "tool_input": {
+        "skill": "queue-backlog"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Launching skill: queue-backlog",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/kafkaQueueProblems' -H 'Content-Type: application/json' -d '{}'; echo; curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/cartFailure' -H 'Content-Type: application/json' -d '{}'",
+        "description": "Check flagd values for kafkaQueueProblems and cartFailure flags"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"value\":100,\"key\":\"kafkaQueueProblems\",\"reason\":\"STATIC\",\"variant\":\"on\",\"metadata\":{}}\n{\"value\":true,\"key\":\"cartFailure\",\"reason\":\"STATIC\",\"variant\":\"on\",\"metadata\":{}}",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"--- kafka lag ---\"; curl -s 'http://localhost:9090/api/v1/query?query=kafka_lag_max'; echo; echo \"--- docker ps cart/kafka ---\"; docker ps --filter name=cart --filter name=kafka; echo; echo \"--- cart error metric names ---\"; curl -s --data-urlencode 'query=traces_span_metrics_calls_total{service_name=\"cart\",status_code=\"STATUS_CODE_ERROR\"}' 'http://localhost:9090/api/v1/query'",
+        "description": "Check kafka lag, cart/kafka container status, and cart error metrics"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "--- kafka lag ---\n{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"__name__\":\"kafka_lag_max\",\"instance\":\"1c2a6ca1-4482-46f4-9ac1-fa23c165e6f2\",\"job\":\"opentelemetry-demo/kafka\",\"service_instance_id\":\"1c2a6ca1-4482-46f4-9ac1-fa23c165e6f2\",\"service_name\":\"kafka\",\"service_namespace\":\"opentelemetry-demo\"},\"value\":[1788679487.008,\"0\"]}]}}\n--- docker ps cart/kafka ---\nCONTAINER ID   IMAGE                                              COMMAND                   CREATED        STATUS                  PORTS                                           NAMES\nad70f2bfc4e0   valkey/valkey:8.1-alpine                           \"docker-entrypoint.s…\"   20 hours ago   Up 20 hours             0.0.0.0:33082->6379/tcp, [::]:33082->6379/tcp   valkey-cart\ne6b577996adf   ghcr.nju.edu.cn/open-telemetry/demo:latest-kafka   \"/__cacert_entrypoin…\"   2 weeks ago    Up 20 hours (healthy)   9092/tcp                                        kafka\n44a06fd59e40   ghcr.nju.edu.cn/open-telemetry/demo:latest-cart    \"./cart\"                  2 weeks ago    Up 20 hours             0.0.0.0:33083->7070/tcp, [::]:33083->7070/tcp   cart\n\n--- cart error metric names ---\n{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"__name__\":\"traces_span_metrics_calls_total\",\"job\":\"opentelemetry-demo/cart\",\"service_name\":\"cart\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_SERVER\",\"span_name\":\"POST /oteldemo.CartService/EmptyCart\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788679487.141,\"1\"]}]}}",
+      "signal_types_covered": [
+        "prometheus",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs cart --tail 50 2>&1 | tail -50",
+        "description": "Check cart container recent logs for error details"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "info: cart.cartstore.ValkeyCartStore[0]\n      AddItemAsync called with userId=cart-test-user-1, productId=OLJCESPC7Z, quantity=1\ninfo: cart.cartstore.ValkeyCartStore[0]\n      GetCartAsync called with userId=cart-test-user-1\ninfo: cart.cartstore.ValkeyCartStore[0]\n      GetCartAsync called with userId=cart-test-user-1\ninfo: cart.cartstore.ValkeyCartStore[0]\n      EmptyCartAsync called with userId=cart-test-user-1\nfail: cart.cartstore.ValkeyCartStore[0]\n      Wasn't able to connect to redis\ninfo: Grpc.AspNetCore.Server.ServerCallHandler[7]\n      Error status code 'FailedPrecondition' with detail 'Can't access cart storage. System.ApplicationException: Wasn't able to connect to redis\n         at cart.cartstore.ValkeyCartStore.EnsureRedisConnected() in /usr/src/app/src/cartstore/ValkeyCartStore.cs:line 95\n         at cart.cartstore.ValkeyCartStore.EmptyCartAsync(String userId) in /usr/src/app/src/cartstore/ValkeyCartStore.cs:line 178' raised.\ninfo: cart.cartstore.ValkeyCartStore[0]\n      AddItemAsync called with userId=cart-test-user-2, productId=OLJCESPC7Z, quantity=1\ninfo: cart.cartstore.ValkeyCartStore[0]\n      GetCartAsync called with userId=cart-test-user-2\ninfo: cart.cartstore.ValkeyCartStore[0]\n      GetCartAsync called with userId=cart-test-user-2\ninfo: cart.cartstore.ValkeyCartStore[0]\n      EmptyCartAsync called with userId=cart-test-user-2\ninfo: cart.cartstore.ValkeyCartStore[0]\n      AddItemAsync called with userId=fi-integration-1, productId=OLJCESPC7Z, quantity=1\ninfo: cart.cartstore.ValkeyCartStore[0]\n      GetCartAsync called with userId=fi-integration-1\ninfo: cart.cartstore.ValkeyCartStore[0]\n      GetCartAsync called with userId=fi-integration-1\ninfo: cart.cartstore.ValkeyCartStore[0]\n      EmptyCartAsync called with userId=fi-integration-1\ninfo: cart.cartstore.ValkeyCartStore[0]\n      AddItemAsync called with userId=fi-integration-2, productId=OLJCESPC7Z, quantity=1\ninfo: cart.cartstore.ValkeyCartStore[0]\n      GetCartAsync called with userId=fi-integration-2\ninfo: cart.cartstore.ValkeyCartStore[0]\n      GetCartAsync called with userId=fi-integration-2\ninfo: cart.cartstore.ValkeyCartStore[0]\n      EmptyCartAsync called with userId=fi-integration-2\ninfo: cart.cartstore.ValkeyCartStore[0]\n      AddItemAsync called with userId=11111111-1111-1111-1111-111111111111, productId=OLJCESPC7Z, quantity=1\ninfo: cart.cartstore.ValkeyCartStore[0]\n      GetCartAsync called with userId=11111111-1111-1111-1111-111111111111\ninfo: cart.cartstore.ValkeyCartStore[0]\n      GetCartAsync called with userId=11111111-1111-1111-1111-111111111111\ninfo: cart.cartstore.ValkeyCartStore[0]\n      AddItemAsync called with userId=22222222-2222-2222-2222-222222222222, productId=OLJCESPC7Z, quantity=1\ninfo: cart.cartstore.ValkeyCartStore[0]\n      GetCartAsync called with userId=22222222-2222-2222-2222-222222222222\ninfo: cart.cartstore.ValkeyCartStore[0]\n      GetCartAsync called with userId=22222222-2222-2222-2222-222222222222",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "mcp__aiops_rag__search_past_incidents",
+      "tool_input": {
+        "query": "flagd kafkaQueueProblems cartFailure 组合故障 cart 连接 redis 失败 kafka lag",
+        "top_k": 3
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "检索到以下历史相似诊断工单（按相似度降序）：\n\n[1] 相似度=0.6853 | 服务=kafka | 类型=resource | 当时走向=feishu_low_confidence\n    根因摘要: 告警描述 orders topic Kafka 消费 lag 单调上升（flagd kafkaQueueProblems 触发，生产快于消费、消费者算力不足），理论上属于典型队列积压型故障。但当前环境实时核验与告警描述不一致：(1) docker ps 中无任何 kafka/orders/accounting/fraud-detection 等消费者相关容器，仅 recommendation、ad、flagd、otel-collector、jaeger、prometheus、opensearch、milvus、gitea 等基础设施/无关服务在跑；(2) Prometheus 查询 kafka_consumergroup_lag 返回空结果集，__name__ 标签中也无任何 kafka_* 指标，说明当前环境未部署/未采集 Kafka；(3) 直接读取故障注入配置 vendor/otel-demo/src/flagd/demo.flagd.json:49-57，kafkaQueueProblems 的 state=ENABLED 但 defaultVariant 仍为 \"off\"，即该故障场景从未被实际触发或已回退；(4) 告警 startsAt=2026-06-20T10:10:00Z 与当前时间 2026-08-18T02:51Z 相差近两个月，且当前容器生命周期（多数 Up 11 小时，recommendation 仅 19 分钟）与告警发生时并非同一次环境运行周期。综合判断：这是一条陈旧/未在当前环境实际生效的失效告警，当前不存在可确认的真实 Kafka 积压问题，无法定位到\"正在发生\"的根因。\n    处置: 未执行任何处置（也不具备执行条件）。核验结论：当前环境未部署任何 kafka/orders 消费者容器；Prometheus 无 kafka_* 系列指标；flagd 的 kafkaQueueProblems 开关仍为 off（故障从未实际注入或已回退）；告警时间与当前环境生命周期不匹配（相差近两个月）。即便按告警描述的理论根因（生产速率>消费速率，消费者算力不足）推演，标准止血也是扩容 orders topic 的消费者（otel-demo 中为 accounting/fraud-detection）副本数/并发度，根治需评估生产端限流或消费端批量/并发参数调优（code_fix）；但 kafka broker 本身是有状态组件，且 accounting/fraud-detection 均不在低风险自动处置授权目标清单（ad, cart, checkout, currency, email, frontend, payment, quote, recommendation, shipping）内，扩容/重启动作命中即会被 hook 拦截，无法自动执行。建议：人工确认该告警是否为陈旧/重复告警并考虑静音；若需复现验证，人工将 kafkaQueueProblems 手动置为 on 并重新部署 kafka/accounting/fraud-detection 相关容器后再排查。\n[2] 相似度=0.6762 | 服务=kafka | 类型=resource | 当时走向=feishu_low_confidence\n    根因摘要: 告警描述为 orders topic Kafka 消费 lag 单调上升（flagd kafkaQueueProblems 触发，生产快于消费、消费者算力不足），属于典型队列积压型故障。但当前环境实时核验与告警描述矛盾：1) `docker ps` 中无 kafka/accounting/fraud-detection/checkout 等相关容器，仅 ad、recommendation、flagd、jaeger、prometheus、opensearch、milvus 等基础设施在跑，且均为近 9 分钟内新启动；2) Prometheus `kafka_consumergroup_lag` 查询返回空结果集，`__name__` 标签中也搜不到任何 kafka_* 指标，说明当前环境未部署/未采集 kafka；3) 直接读取故障注入脚本对应的 flagd 配置文件 vendor/otel-demo/src/flagd/demo.flagd.json:49-57，kafkaQueueProblems 的 defaultVariant 当前为 \"off\"（state=ENABLED 但未被 scripts/inject.sh s3 打开）；4) 告警 startsAt=2026-06-20T10:10:00Z 与当前环境生命周期（容器仅 Up 9 分钟）不一致，相差近两个月。综合判断：这是陈旧/未在当前环境实际生效的失效告警，当前不存在可确认的真实 Kafka 积压问题。\n    处置: 未执行任何自动处置。若按告警描述的理论根因（生产速率>消费速率，消费者算力不足）来看，标准止血是扩容 orders topic 的消费者（otel-demo 中为 accounting/fraud-detection）副本数或并发度以追平生产速率；根治需评估生产端限流或消费端批量/并发参数调优（code_fix）。但本次不具备执行条件：(1) 当前环境未部署任何 kafka/consumer 容器，Prometheus 无 kafka_* 指标，flagd 的 kafkaQueueProblems 仍为 off，找不到实时证据证明积压正在发生；(2) 即便坐实，kafka broker 是有状态组件，真正需要扩容的消费者（accounting/fraud-detection）也不在低风险自动处置授权目标清单（ad, cart, checkout, currency, email, frontend, payment, quote, recommendation, shipping）内，命中即会被 hook 拦截，无法自动执行。建议：人工确认该告警是否为陈旧/重复告警（与当前环境时间线不匹配），必要时静音；若确认需要复现，人工手动将 kafkaQueueProblems 置为 on 并重新部署 kafka/accounting/fraud-detection 容器，再由人工执行消费者扩容。\n[3] 相似度=0.6739 | 服务=kafka | 类型=resource | 当时走向=feishu_low_confidence\n    根因摘要: 告警描述 orders topic Kafka 消费 lag 持续上升（flagd kafkaQueueProblems 触发，生产快于消费、消费者健康但算力不足），理论上是典型队列积压故障。但当前环境实时核验与告警描述不符：docker ps 中无任何 kafka/orders 消费者相关容器（accounting、fraud-detection、checkout 均未运行，仅 ad、recommendation 等基础设施在跑，且均为近11小时/23分钟内启动）；Prometheus `__name__` 标签中查不到任何 kafka_* 指标，说明当前环境未部署/未采集 Kafka；flagd 配置文件 vendor/otel-demo/src/flagd/demo.flagd.json 第49-57行显示 kafkaQueueProblems 的 defaultVariant 为 \"off\"（故障从未被实际注入或已回退）；告警 startsAt=2026-06-20T10:10:00Z 与当前时间 2026-08-18 相差近两个月，且容器生命周期不匹配。结合历史工单检索（4条高相似度案例均得出相同结论），判断本次为陈旧/未实际生效的失效告警，当前不存在可确认的真实 Kafka 积压问题，无法坐实\"正在发生\"的根因，未执行任何处置。\n    处置: 未执行任何自动处置（证据不足 + 不具备执行条件）。核验结论：(1) docker ps 无 kafka/accounting/fraud-detection/checkout 等相关容器运行；(2) Prometheus 无任何 kafka_* 指标，kafka_consumergroup_lag 查询返回空；(3) flagd 配置 vendor/otel-demo/src/flagd/demo.flagd.json:49-57 中 kafkaQueueProblems 的 defaultVariant 仍为 \"off\"，故障场景未实际触发；(4) 告警时间 startsAt=2026-06-20 与当前 2026-08-18 相差近两个月，与当前容器生命周期（Up 11h/23m）不一致。即便按告警描述的理论根因（生产速率>消费速率、消费者算力不足）推演，标准止血是扩容 orders topic 消费者（otel-demo 中为 accounting/fraud-detection）副本数或并发度；但 kafka broker 本身是有状态组件，且真正的消费者服务 accounting/fraud-detection 均不在低风险自动处置授权目标清单（ad, cart, checkout, currency, email, frontend, payment, quote, recommendation, shipping）内，扩容/重启动作命中即会被 hook 拦截。建议：人工确认该告警是否为陈旧/重复告警并在告警系统中静音；若需复现验证，需人工手动将 kafkaQueueProblems 置为 on 并重新部署 kafka/accounting/fraud-detection 相关容器后再排查，根治则需评估生产端限流或消费端批量/并发参数调优。\n\n注意：历史工单仅供参考，请结合当前实时观测证据独立判断，不要盲目照搬。",
+      "signal_types_covered": [
+        "prometheus",
+        "jaeger",
+        "kubectl_status",
+        "rag_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "告警描述的两个 flagd 故障开关（kafkaQueueProblems、cartFailure）当前经 OFREP 实时核验均处于 ON 状态：kafkaQueueProblems value=100/variant=on，cartFailure value=true/variant=on。这是当前环境正在生效的主动故障注入，非陈旧告警。cart 容器日志实时可见 \"Wasn't able to connect to redis\" 导致 EmptyCart 等 gRPC 调用返回 FailedPrecondition（Jaeger/Prometheus 指标 traces_span_metrics_calls_total{service_name=\"cart\",span_name=\"POST /oteldemo.CartService/EmptyCart\",status_code=\"STATUS_CODE_ERROR\"}=1 佐证），而 valkey-cart（cart 的 redis 存储）容器本身健康运行 20 小时，说明这是 cartFailure 开关模拟的连接失败，不是真实 redis 故障。kafka 容器健康(healthy)，kafka_lag_max 当前采样为 0，尚未观测到 lag 尖峰（可能是采样时刻的瞬时值，或积压效应尚未累积），与 kafkaQueueProblems=on 的配置一致但暂未表现为明显积压。根因是两个 flagd 故障注入开关被人为/测试打开，制造了 cart 失败与 kafka 队列问题的组合故障，而非代码缺陷或真实基础设施故障。",
+        "kind": "config",
+        "suspect_service": "cart,kafka",
+        "suspect_repo": null,
+        "suspect_commit_hint": null,
+        "suspect_file_hint": null,
+        "remediation_type": "online_op",
+        "remediation_detail": "未自动执行处置：真正的止血手段是把 flagd 的 kafkaQueueProblems 和 cartFailure 两个开关从 \"on\" 改回 \"off\"（即取消故障注入），这不属于 docker 白名单里的 restart_instance/migrate_instance/scale_resources 任一命令形态,也不针对某个具体授权容器,因此不会被 hook 放行,不能自动执行,需人工在 flagd 配置中手动关闭这两个开关。重启/迁移 cart 或 kafka 容器本身无法根治问题——开关仍为 on，故障会立即复现，因此本次未对 cart/kafka 容器执行任何自动重启/迁移/扩容操作。建议人工核实这是否为主动的混沌测试/演练；若是意外遗留打开，尽快人工关闭这两个 flagd 开关；kafka lag 目前采样为 0，可持续观察 kafka_lag_max 是否随时间上升，如出现真实积压再评估是否需要扩容消费者（该操作同样超出当前低风险白名单）。",
+        "confidence": 0.9,
+        "evidence": [
+          "OFREP 实时查询 flagd: curl -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/kafkaQueueProblems' 返回 {\"value\":100,\"variant\":\"on\",\"reason\":\"STATIC\"}",
+          "OFREP 实时查询 flagd: curl -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/cartFailure' 返回 {\"value\":true,\"variant\":\"on\",\"reason\":\"STATIC\"}",
+          "docker logs cart --tail 50: 出现 'fail: cart.cartstore.ValkeyCartStore[0] Wasn't able to connect to redis' 及 gRPC FailedPrecondition 错误，紧跟在 EmptyCartAsync 调用之后，与 cartFailure 开关描述一致",
+          "docker ps: valkey-cart (redis 存储) 容器 Up 20 hours 且无异常，kafka 容器 Up 20 hours (healthy)，均未崩溃，排除真实基础设施宕机，支持'模拟故障'而非'真实故障'的判断",
+          "PromQL: traces_span_metrics_calls_total{service_name=\"cart\",status_code=\"STATUS_CODE_ERROR\"} 返回 span_name='POST /oteldemo.CartService/EmptyCart' value=1，佐证 cart 侧确有失败调用",
+          "PromQL: kafka_lag_max 当前查询结果 value=0，未观测到明显积压尖峰（时间点快照，供参考）",
+          "历史相似工单检索(search_past_incidents)：3 条相似案例均因 flagd 开关在当时核验为 off、环境陈旧而判定为失效告警走 feishu_low_confidence；本次核验开关均为 on 且有实时日志证据，与历史案例的关键前提（开关状态）不同，故未采用其'陈旧告警'结论，而是基于本次独立实时证据判定为当前生效的故障注入"
+        ],
+        "also_code_fix": false
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "prometheus",
+        "jaeger",
+        "logs",
+        "kubectl_status",
+        "rag_history"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ],
+  "final_diagnosis": {
+    "summary": "告警描述的两个 flagd 故障开关（kafkaQueueProblems、cartFailure）当前经 OFREP 实时核验均处于 ON 状态：kafkaQueueProblems value=100/variant=on，cartFailure value=true/variant=on。这是当前环境正在生效的主动故障注入，非陈旧告警。cart 容器日志实时可见 \"Wasn't able to connect to redis\" 导致 EmptyCart 等 gRPC 调用返回 FailedPrecondition（Jaeger/Prometheus 指标 traces_span_metrics_calls_total{service_name=\"cart\",span_name=\"POST /oteldemo.CartService/EmptyCart\",status_code=\"STATUS_CODE_ERROR\"}=1 佐证），而 valkey-cart（cart 的 redis 存储）容器本身健康运行 20 小时，说明这是 cartFailure 开关模拟的连接失败，不是真实 redis 故障。kafka 容器健康(healthy)，kafka_lag_max 当前采样为 0，尚未观测到 lag 尖峰（可能是采样时刻的瞬时值，或积压效应尚未累积），与 kafkaQueueProblems=on 的配置一致但暂未表现为明显积压。根因是两个 flagd 故障注入开关被人为/测试打开，制造了 cart 失败与 kafka 队列问题的组合故障，而非代码缺陷或真实基础设施故障。",
+    "kind": "config",
+    "suspect_service": "cart,kafka",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "online_op",
+    "remediation_detail": "未自动执行处置：真正的止血手段是把 flagd 的 kafkaQueueProblems 和 cartFailure 两个开关从 \"on\" 改回 \"off\"（即取消故障注入），这不属于 docker 白名单里的 restart_instance/migrate_instance/scale_resources 任一命令形态,也不针对某个具体授权容器,因此不会被 hook 放行,不能自动执行,需人工在 flagd 配置中手动关闭这两个开关。重启/迁移 cart 或 kafka 容器本身无法根治问题——开关仍为 on，故障会立即复现，因此本次未对 cart/kafka 容器执行任何自动重启/迁移/扩容操作。建议人工核实这是否为主动的混沌测试/演练；若是意外遗留打开，尽快人工关闭这两个 flagd 开关；kafka lag 目前采样为 0，可持续观察 kafka_lag_max 是否随时间上升，如出现真实积压再评估是否需要扩容消费者（该操作同样超出当前低风险白名单）。",
+    "confidence": 0.9,
+    "evidence": [
+      "OFREP 实时查询 flagd: curl -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/kafkaQueueProblems' 返回 {\"value\":100,\"variant\":\"on\",\"reason\":\"STATIC\"}",
+      "OFREP 实时查询 flagd: curl -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/cartFailure' 返回 {\"value\":true,\"variant\":\"on\",\"reason\":\"STATIC\"}",
+      "docker logs cart --tail 50: 出现 'fail: cart.cartstore.ValkeyCartStore[0] Wasn't able to connect to redis' 及 gRPC FailedPrecondition 错误，紧跟在 EmptyCartAsync 调用之后，与 cartFailure 开关描述一致",
+      "docker ps: valkey-cart (redis 存储) 容器 Up 20 hours 且无异常，kafka 容器 Up 20 hours (healthy)，均未崩溃，排除真实基础设施宕机，支持'模拟故障'而非'真实故障'的判断",
+      "PromQL: traces_span_metrics_calls_total{service_name=\"cart\",status_code=\"STATUS_CODE_ERROR\"} 返回 span_name='POST /oteldemo.CartService/EmptyCart' value=1，佐证 cart 侧确有失败调用",
+      "PromQL: kafka_lag_max 当前查询结果 value=0，未观测到明显积压尖峰（时间点快照，供参考）",
+      "历史相似工单检索(search_past_incidents)：3 条相似案例均因 flagd 开关在当时核验为 off、环境陈旧而判定为失效告警走 feishu_low_confidence；本次核验开关均为 on 且有实时日志证据，与历史案例的关键前提（开关状态）不同，故未采用其'陈旧告警'结论，而是基于本次独立实时证据判定为当前生效的故障注入"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "feishu_online_op",
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"告警描述的两个 flagd 故障开关（kafkaQueueProblems、cartFailure）当前经 OFREP 实时核验均处于 ON 状态：kafkaQueueProblems value=100/variant=on，cartFailure value=true/variant=on。这是当前环境正在生效的主动故障注入，非陈旧告警。cart 容器日志实时可见 \\\"Wasn't able to connect to redis\\\" 导致 EmptyCart 等 gRPC 调用返回 FailedPrecondition（Jaeger/Prometheus 指标 traces_span_metrics_calls_total{service_name=\\\"cart\\\",span_name=\\\"POST /oteldemo.CartService/EmptyCart\\\",status_code=\\\"STATUS_CODE_ERROR\\\"}=1 佐证），而 valkey-cart（cart 的 redis 存储）容器本身健康运行 20 小时，说明这是 cartFailure 开关模拟的连接失败，不是真实 redis 故障。kafka 容器健康(healthy)，kafka_lag_max 当前采样为 0，尚未观测到 lag 尖峰（可能是采样时刻的瞬时值，或积压效应尚未累积），与 kafkaQueueProblems=on 的配置一致但暂未表现为明显积压。根因是两个 flagd 故障注入开关被人为/测试打开，制造了 cart 失败与 kafka 队列问题的组合故障，而非代码缺陷或真实基础设施故障。\",\"kind\":\"config\",\"suspect_service\":\"cart,kafka\",\"suspect_repo\":null,\"suspect_commit_hint\":null,\"suspect_file_hint\":null,\"remediation_type\":\"online_op\",\"remediation_detail\":\"未自动执行处置：真正的止血手段是把 flagd 的 kafkaQueueProblems 和 cartFailure 两个开关从 \\\"on\\\" 改回 \\\"off\\\"（即取消故障注入），这不属于 docker 白名单里的 restart_instance/migrate_instance/scale_resources 任一命令形态,也不针对某个具体授权容器,因此不会被 hook 放行,不能自动执行,需人工在 flagd 配置中手动关闭这两个开关。重启/迁移 cart 或 kafka 容器本身无法根治问题——开关仍为 on，故障会立即复现，因此本次未对 cart/kafka 容器执行任何自动重启/迁移/扩容操作。建议人工核实这是否为主动的混沌测试/演练；若是意外遗留打开，尽快人工关闭这两个 flagd 开关；kafka lag 目前采样为 0，可持续观察 kafka_lag_max 是否随时间上升，如出现真实积压再评估是否需要扩容消费者（该操作同样超出当前低风险白名单）。\",\"confidence\":0.9,\"evidence\":[\"OFREP 实时查询 flagd: curl -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/kafkaQueueProblems' 返回 {\\\"value\\\":100,\\\"variant\\\":\\\"on\\\",\\\"reason\\\":\\\"STATIC\\\"}\",\"OFREP 实时查询 flagd: curl -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/cartFailure' 返回 {\\\"value\\\":true,\\\"variant\\\":\\\"on\\\",\\\"reason\\\":\\\"STATIC\\\"}\",\"docker logs cart --tail 50: 出现 'fail: cart.cartstore.ValkeyCartStore[0] Wasn't able to connect to redis' 及 gRPC FailedPrecondition 错误，紧跟在 EmptyCartAsync 调用之后，与 cartFailure 开关描述一致\",\"docker ps: valkey-cart (redis 存储) 容器 Up 20 hours 且无异常，kafka 容器 Up 20 hours (healthy)，均未崩溃，排除真实基础设施宕机，支持'模拟故障'而非'真实故障'的判断\",\"PromQL: traces_span_metrics_calls_total{service_name=\\\"cart\\\",status_code=\\\"STATUS_CODE_ERROR\\\"} 返回 span_name='POST /oteldemo.CartService/EmptyCart' value=1，佐证 cart 侧确有失败调用\",\"PromQL: kafka_lag_max 当前查询结果 value=0，未观测到明显积压尖峰（时间点快照，供参考）\",\"历史相似工单检索(search_past_incidents)：3 条相似案例均因 flagd 开关在当时核验为 off、环境陈旧而判定为失效告警走 feishu_low_confidence；本次核验开关均为 on 且有实时日志证据，与历史案例的关键前提（开关状态）不同，故未采用其'陈旧告警'结论，而是基于本次独立实时证据判定为当前生效的故障注入\"],\"also_code_fix\":false}"
+  }
+}

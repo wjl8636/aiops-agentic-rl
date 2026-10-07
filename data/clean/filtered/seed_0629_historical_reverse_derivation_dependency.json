@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "critical",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0015-ad-dependency",
+    "description": "ad 服务给广告排序新增了一次用户画像查询调用，这次调用没有配超时；画像服务在一次数据刷新期间响应变慢，ad 服务的请求处理协程大量堆积在等待画像查询返回上，广告位请求整体超时。"
+  },
+  "startsAt": "2026-07-21T17:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0015-ad-dependency：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

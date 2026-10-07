@@ -1,0 +1,109 @@
+{
+  "alert": {
+    "alertname": "MockAdCpuThrottled",
+    "service": "ad",
+    "labels": {
+      "service": "ad",
+      "severity": "warning",
+      "job": "ad"
+    },
+    "annotations": {
+      "summary": "ad 服务 CPU 打满，p99 延迟飙升",
+      "description": "ad 服务容器 CPU throttling 持续 100%，AdRequest p99 从 80ms 涨到 1.2s。"
+    },
+    "startsAt": "2026-06-20T11:00:00Z"
+  },
+  "alert_id": "mock_hookdeny_res",
+  "steps": [
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker stats --no-stream ad"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "ad   CPU% 99.8   MEM 480MiB / 512MiB",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s http://localhost:9090/api/v1/query?query=rate(container_cpu_usage_seconds_total{name=\"ad\"}[1m])"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Prometheus: ad 容器 CPU throttling 比例过去 10 分钟持续 100%。",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker exec -it ad top"
+      },
+      "hook_decision": "deny",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "PreToolUse hook 拒绝执行：docker exec 属于进容器高风险操作，不在低风险白名单内。",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker update --cpus 2 --memory 1024m ad"
+      },
+      "hook_decision": "allow",
+      "hook_action": "scale_resources",
+      "hook_target": "ad",
+      "observation": "ad 容器资源上限已提升为 --cpus 2 --memory 1024m。",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    }
+  ],
+  "final_diagnosis": {
+    "summary": "ad 服务 CPU 打满导致延迟飙升，抬高资源上限后恢复。",
+    "kind": "resource",
+    "suspect_service": "ad",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "online_op",
+    "remediation_detail": "已临时抬高 ad 容器 CPU/内存上限缓解打满。",
+    "confidence": 0.82,
+    "evidence": [
+      "docker stats 显示 ad 容器 CPU% 99.8",
+      "Prometheus container_cpu_usage_seconds_total 显示 ad 持续 100% throttling"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": [
+      {
+        "action": "scale_resources",
+        "target": "ad",
+        "command": "docker update --cpus 2 --memory 1024m ad",
+        "ts": "2026-06-20T00:00:00Z"
+      }
+    ]
+  },
+  "ground_truth": null,
+  "route": "auto_remediated",
+  "post_action_health": {
+    "checked": true,
+    "healthy": true,
+    "metric": "http_error_rate",
+    "window_s": 60
+  },
+  "meta": {
+    "source": "mock",
+    "degraded": null,
+    "raw": null
+  }
+}

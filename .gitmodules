@@ -1,0 +1,3 @@
+[submodule "AIops-agent"]
+	path = AIops-agent
+	url = git@github.com:HuaiNan54321/AIops-agent.git

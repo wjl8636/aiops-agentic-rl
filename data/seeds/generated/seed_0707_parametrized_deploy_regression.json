@@ -1,0 +1,15 @@
+{
+  "alertname": "ShippingLatencyRegressionRumor",
+  "service": "shipping",
+  "labels": {
+    "service": "shipping",
+    "severity": "warning",
+    "job": "shippingservice"
+  },
+  "annotations": {
+    "summary": "有反馈称 shipping 今天早上发布新版本后下单变慢，怀疑发版回归",
+    "description": "运营群里有人反映\"shipping 组今天早上发布了一个新版本，发布后下单流程感觉变慢了\"，巡检脚本据此产生这条告警。查 deploys.log 全量记录，里面只有recommendation 服务的两条历史发布记录，完全没有 shipping 的任何发布记录；docker inspect shipping 显示容器创建时间是两周前，中间没有重建/重启过；docker stats 显示 shipping 容器 CPU/内存都在很低的正常水平；Prometheus 上shipping 服务的调用错误率、延迟都在历史基线范围内。怀疑\"今天发布\"这个说法本身是误传，没有对应的真实发布事件，也没有观测到延迟异常。"
+  },
+  "startsAt": "2026-09-01T12:00:00Z",
+  "scenario_hint": "[参数化扩增/pure_info_only] kind=deploy_regression service=shipping：deploys.log 里没有 shipping 的任何发布记录、容器也没有重建痕迹，服务当前真实健康，不注入任何故障：验证「所谓的发版回归本身是误传时应如实报info_only」这一场景，覆盖 deploy_regression 这个 kind"
+}

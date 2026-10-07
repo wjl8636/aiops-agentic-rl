@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0035-ad-resource",
+    "description": "告警描述 ad 服务因 flagd 开关 adServiceHighCpu(实际 flag 名 adHighCpu) 导致 CPU 打满、p99 延迟攀升，但当前实时观测与该描述矛盾：flagd 配置中 adHighCpu.defaultVariant 当前为 \"off\"（state=ENABLED 但默认关闭）；Prometheus jvm_cpu_recent_utilization_ratio{job=\"opentelemetry-demo/ad\"} 近 10 分钟稳定在 0.0005~0.0007（近乎空载）；docker stats 显示 ad 容器 CPU 仅 0.15%~0.2%；demo_ad_requests_total 无任何时间序列（无流量）。告警 startsAt 为 2026-06-20，与当前日期 2026-08-17 相差近两个月，且容器为近期新启动（Up ~4min，RestartCount=0），说明当前运行的实例与告警发生时并非同一次生命周期。综合判断：此告警很可能是历史/失效告警，或对应的 flagd 故障注入未在当前环境实际生效/已被回退，当前不存在需要止血的活跃 CPU 饱和问题。因此未执行任何自动处置（白名单内的 scale_resources/restart 均无正当理由使用）；若后续该 flag 被重新置为 on 且 CPU/延迟指标真实抬升，则应对 ad 走 online_op（抬高 CPU 资源上限或临时限流），是否需要代码侧改动需另行评估。"
+  },
+  "startsAt": "2026-07-20T22:15:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0035-ad-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

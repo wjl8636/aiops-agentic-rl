@@ -1,0 +1,15 @@
+{
+  "alertname": "KafkaConsumerLag",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "warning",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "kafka 消费延迟持续升高",
+    "description": "flagd 开关 kafkaQueueProblems 打开后，消费速率跟不上生产速率，队列积压。"
+  },
+  "startsAt": "2026-06-20T10:20:00Z",
+  "scenario_hint": "flagd 开关引发的队列积压"
+}

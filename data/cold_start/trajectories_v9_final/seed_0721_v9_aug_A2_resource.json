@@ -1,0 +1,234 @@
+{
+  "alert": {
+    "alertname": "QueueBacklogWithAdLatency",
+    "service": "kafka",
+    "labels": {
+      "service": "kafka",
+      "severity": "critical",
+      "job": "kafka"
+    },
+    "annotations": {
+      "summary": "orders 消费积压持续增长，同期广告服务延迟也有毛刺",
+      "description": "orders topic 的消费 lag 从 11:00 起单调上升，现已积压上万条（kafkaQueueProblems开关疑似被打开，消费端被注入了处理延迟）；同一时段 ad 服务延迟也出现毛刺，值班怀疑adHighCpu 开关也被一起打开了，两个故障可能来自同一次误操作。请分别核实两个开关的实际状态与各自的影响，再决定处置顺序。"
+    },
+    "startsAt": "2026-09-02T16:05:00Z",
+    "scenario_hint": "[v9增强/A2_部分证据] flags=kafkaQueueProblems：只注入 flagA（真实存在、OFREP 可验证），叙事声称的第二个症状（adHighCpu）刻意不注入——验证「只写验证过的 flagA 证据、对 flagB 如实写未观测到/不成立、不编造也不外推」"
+  },
+  "alert_id": "seed_0721_v9_aug_A2_resource",
+  "final_diagnosis": {
+    "summary": "告警怀疑的两个开关经 flagd OFREP 权威核实：kafkaQueueProblems 确为 ON（value=100），adHighCpu 确为 OFF——两故障并非同一次误操作。kafkaQueueProblems 虽已开启（注入消费延迟的名义故障），但 fraud-detection 对 orders topic 的 kafka_consumer_records_lag 在过去3h（每5min采样）恒为0、kafka_lag_max=0，未观测到真实积压（load-generator 仅启动6min、流量低尚未体现注入影响）。adHighCpu 开关为关闭，ad 服务 getRandomAds p99 稳定在~2ms、仅2-8ms正常抖动，无 CPU 问题——第二个怀疑不成立。处置顺序：仅需处理 kafkaQueueProblems（关闭该 flagd 开关），ad 无需动作。该关闭动作属配置类线上操作，但 flagd/kafka/fraud-detection 均不在低风险自动处置白名单，交人工执行，未自动处置。",
+    "kind": "config",
+    "suspect_service": "kafka",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "online_op",
+    "remediation_detail": "根治即误操作回退：人工将 flagd 中 kafkaQueueProblems 开关由 on 置回 off（defaultVariant=off），消除注入到 orders 消费端的处理延迟。该动作不在低风险自动处置白名单（flagd 配置变更、kafka 为有状态组件、消费者 fraud-detection/accounting 不在授权目标清单 ad/cart/checkout/currency/email/frontend/payment/quote/recommendation/shipping 内），故未自动执行，交人工/发卡处理。adHighCpu 开关经核实已是 off、ad 延迟正常，无需任何处置。补充：当前 orders topic 消费 lag 实测恒为0、无正在发生的真实积压，故无需扩容消费者；若关闭开关后仍需验证，可待流量上来后复查 kafka_consumer_records_lag 趋势。",
+    "confidence": 0.72,
+    "evidence": [
+      "flagd OFREP: POST /ofrep/v1/evaluate/flags/kafkaQueueProblems 返回 {\"value\":100,\"variant\":\"on\",\"reason\":\"STATIC\"} —— kafkaQueueProblems 开关确为开启（权威实时值）",
+      "flagd OFREP: POST /ofrep/v1/evaluate/flags/adHighCpu 返回 {\"value\":false,\"variant\":\"off\",\"reason\":\"STATIC\"} —— adHighCpu 开关实为关闭，值班对第二个开关的怀疑不成立，两故障非同一次误操作",
+      "Prometheus query_range kafka_consumer_records_lag{service_name=\"fraud-detection\",topic=\"orders\"} 过去3h(step=300s,25个采样点)恒为 '0'；即时查询 kafka_lag_max=0 —— 尽管开关开启，当前无真实消费积压",
+      "Prometheus query_range histogram_quantile(0.99, rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"ad\",span_name=\"getRandomAds\"}[5m])) 过去3h稳定在~1.98ms，仅偶发3.9-7.9ms抖动 —— ad 延迟正常，无 CPU 打满特征",
+      "docker ps -a: kafka Up 3h(healthy)、ad Up 13h、checkout Up 5h、load-generator Up 6min —— load-generator 刚启动、流量低，可解释开关开启但注入影响尚未体现为可观测 lag",
+      "历史工单[2]相似度0.73同款结论：kafkaQueueProblems defaultVariant=on 但 fraud-detection orders lag 恒为0，与本次实时观测一致，佐证'开关名义开启但无真实积压'",
+      "未执行任何自动处置：关闭 flagd 开关/扩容 kafka/动 fraud-detection 均不在低风险白名单，命中即被 hook 拦，交人工"
+    ],
+    "time_window": null,
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "feishu_online_op",
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"告警怀疑的两个开关经 flagd OFREP 权威核实：kafkaQueueProblems 确为 ON（value=100），adHighCpu 确为 OFF——两故障并非同一次误操作。kafkaQueueProblems 虽已开启（注入消费延迟的名义故障），但 fraud-detection 对 orders topic 的 kafka_consumer_records_lag 在过去3h（每5min采样）恒为0、kafka_lag_max=0，未观测到真实积压（load-generator 仅启动6min、流量低尚未体现注入影响）。adHighCpu 开关为关闭，ad 服务 getRandomAds p99 稳定在~2ms、仅2-8ms正常抖动，无 CPU 问题——第二个怀疑不成立。处置顺序：仅需处理 kafkaQueueProblems（关闭该 flagd 开关），ad 无需动作。该关闭动作属配置类线上操作，但 flagd/kafka/fraud-detection 均不在低风险自动处置白名单，交人工执行，未自动处置。\",\"kind\":\"config\",\"suspect_service\":\"kafka\",\"remediation_type\":\"online_op\",\"remediation_detail\":\"根治即误操作回退：人工将 flagd 中 kafkaQueueProblems 开关由 on 置回 off（defaultVariant=off），消除注入到 orders 消费端的处理延迟。该动作不在低风险自动处置白名单（flagd 配置变更、kafka 为有状态组件、消费者 fraud-detection/accounting 不在授权目标清单 ad/cart/checkout/currency/email/frontend/payment/quote/recommendation/shipping 内），故未自动执行，交人工/发卡处理。adHighCpu 开关经核实已是 off、ad 延迟正常，无需任何处置。补充：当前 orders topic 消费 lag 实测恒为0、无正在发生的真实积压，故无需扩容消费者；若关闭开关后仍需验证，可待流量上来后复查 kafka_consumer_records_lag 趋势。\",\"confidence\":0.72,\"also_code_fix\":false,\"suspect_repo\":null,\"suspect_commit_hint\":null,\"suspect_file_hint\":null,\"evidence\":[\"flagd OFREP: POST /ofrep/v1/evaluate/flags/kafkaQueueProblems 返回 {\\\"value\\\":100,\\\"variant\\\":\\\"on\\\",\\\"reason\\\":\\\"STATIC\\\"} —— kafkaQueueProblems 开关确为开启（权威实时值）\",\"flagd OFREP: POST /ofrep/v1/evaluate/flags/adHighCpu 返回 {\\\"value\\\":false,\\\"variant\\\":\\\"off\\\",\\\"reason\\\":\\\"STATIC\\\"} —— adHighCpu 开关实为关闭，值班对第二个开关的怀疑不成立，两故障非同一次误操作\",\"Prometheus query_range kafka_consumer_records_lag{service_name=\\\"fraud-detection\\\",topic=\\\"orders\\\"} 过去3h(step=300s,25个采样点)恒为 '0'；即时查询 kafka_lag_max=0 —— 尽管开关开启，当前无真实消费积压\",\"Prometheus query_range histogram_quantile(0.99, rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\\\"ad\\\",span_name=\\\"getRandomAds\\\"}[5m])) 过去3h稳定在~1.98ms，仅偶发3.9-7.9ms抖动 —— ad 延迟正常，无 CPU 打满特征\",\"docker ps -a: kafka Up 3h(healthy)、ad Up 13h、checkout Up 5h、load-generator Up 6min —— load-generator 刚启动、流量低，可解释开关开启但注入影响尚未体现为可观测 lag\",\"历史工单[2]相似度0.73同款结论：kafkaQueueProblems defaultVariant=on 但 fraud-detection orders lag 恒为0，与本次实时观测一致，佐证'开关名义开启但无真实积压'\",\"未执行任何自动处置：关闭 flagd 开关/扩容 kafka/动 fraud-detection 均不在低风险白名单，命中即被 hook 拦，交人工\"]}",
+    "teacher_model": "claude-4.8-opus-google",
+    "usage": {
+      "input_tokens": 2874,
+      "output_tokens": 8143,
+      "cache_creation_input_tokens": 84583,
+      "cache_read_input_tokens": 112145
+    },
+    "cost_usd": 0.8026612499999999,
+    "num_turns": 11,
+    "duration_ms": 121059,
+    "model_usage": {
+      "claude-4.8-opus-google": {
+        "inputTokens": 2874,
+        "outputTokens": 8143,
+        "cacheReadInputTokens": 112145,
+        "cacheCreationInputTokens": 84583,
+        "webSearchRequests": 0,
+        "costUSD": 0.8026612499999999,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000,
+        "canonicalModel": "claude-4.8-opus-google",
+        "provider": "firstParty"
+      }
+    },
+    "pruning": {
+      "steps_before": 9,
+      "steps_after": 9,
+      "removed": [],
+      "restored_by_verification": []
+    }
+  },
+  "steps": [
+    {
+      "tool_name": "Skill",
+      "tool_input": {
+        "skill": "queue-backlog"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Launching skill: queue-backlog",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/kafkaQueueProblems' -H 'Content-Type: application/json' -d '{}'; echo; curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/adHighCpu' -H 'Content-Type: application/json' -d '{}'; echo",
+        "description": "Check both flag states via flagd OFREP"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"value\":100,\"key\":\"kafkaQueueProblems\",\"reason\":\"STATIC\",\"variant\":\"on\",\"metadata\":{}}\n{\"value\":false,\"key\":\"adHighCpu\",\"reason\":\"STATIC\",\"variant\":\"off\",\"metadata\":{}}",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps -a --format '{{.Names}}\\t{{.Status}}' | grep -Ei 'kafka|ad|checkout|order'",
+        "description": "List kafka/ad related containers"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "load-generator\tUp 6 minutes\ncheckout\tUp 5 hours\nkafka\tUp 3 hours (healthy)\nad\tUp 13 hours",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== consumer lag (current) ===\"; curl -s 'http://localhost:9090/api/v1/query?query=kafka_consumer_records_lag' | head -c 2000; echo; echo \"=== kafka_lag_max ===\"; curl -s 'http://localhost:9090/api/v1/query?query=kafka_lag_max' | head -c 1000; echo",
+        "description": "Query kafka consumer lag metrics"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== consumer lag (current) ===\n{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"__name__\":\"kafka_consumer_records_lag\",\"client_id\":\"consumer-fraud-detection-1\",\"instance\":\"a4b11151-2da7-4a0c-b63b-35a3ab04dfd5\",\"job\":\"opentelemetry-demo/fraud-detection\",\"partition\":\"0\",\"service_instance_id\":\"a4b11151-2da7-4a0c-b63b-35a3ab04dfd5\",\"service_name\":\"fraud-detection\",\"service_namespace\":\"opentelemetry-demo\",\"topic\":\"orders\"},\"value\":[1788845909.096,\"0\"]}]}}\n=== kafka_lag_max ===\n{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"__name__\":\"kafka_lag_max\",\"instance\":\"c26439ed-70fa-4a29-b94a-194c055d300e\",\"job\":\"opentelemetry-demo/kafka\",\"service_instance_id\":\"c26439ed-70fa-4a29-b94a-194c055d300e\",\"service_name\":\"kafka\",\"service_namespace\":\"opentelemetry-demo\"},\"value\":[1788845909.124,\"0\"]}]}}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== what metrics does ad expose ===\"; curl -s --data-urlencode 'query={service_name=\"ad\"}' 'http://localhost:9090/api/v1/query' | head -c 1500; echo",
+        "description": "Discover ad service metrics"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== what metrics does ad expose ===\n{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"instance\":\"77d8a26e-1958-47df-a890-ff99aca7eb55\",\"job\":\"opentelemetry-demo/ad\",\"le\":\"10000\",\"service_instance_id\":\"77d8a26e-1958-47df-a890-ff99aca7eb55\",\"service_name\":\"ad\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"flagd.evaluation.v2.Service/ResolveBoolean\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788845909.278,\"93297\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_count\",\"instance\":\"1ca98097-fb94-4406-a285-a13e5ba87424\",\"job\":\"opentelemetry-demo/ad\",\"service_instance_id\":\"1ca98097-fb94-4406-a285-a13e5ba87424\",\"service_name\":\"ad\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_INTERNAL\",\"span_name\":\"getRandomAds\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788845909.278,\"154\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"instance\":\"1ca98097-fb94-4406-a285-a13e5ba87424\",\"job\":\"opentelemetry-demo/ad\",\"le\":\"800\",\"service_instance_id\":\"1ca98097-fb94-4406-a285-a13e5ba87424\",\"service_name\":\"ad\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_INTERNAL\",\"span_name\":\"getRandomAds\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788845909.278,\"154\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"instance\":\"567440b0-0780-43ce-ac41-d20f08210e54\",\"job\":\"opentelemetry-demo/ad\",\"le\":\"8\",\"service_instance_i",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "now=1788845909\nstart=$((now-10800))\necho \"=== consumer lag trend (last 3h) ===\"; curl -s --data-urlencode \"query=kafka_consumer_records_lag{service_name=\\\"fraud-detection\\\"}\" --data-urlencode \"start=$start\" --data-urlencode \"end=$now\" --data-urlencode \"step=300\" 'http://localhost:9090/api/v1/query_range' | python3 -c \"import sys,json; d=json.load(sys.stdin); [print(v) for r in d['data']['result'] for v in r['values']]\" 2>/dev/null | tail -25",
+        "description": "Consumer lag trend over 3h"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== consumer lag trend (last 3h) ===\n[1788838709, '0']\n[1788839009, '0']\n[1788839309, '0']\n[1788839609, '0']\n[1788839909, '0']\n[1788840209, '0']\n[1788840509, '0']\n[1788840809, '0']\n[1788841109, '0']\n[1788841409, '0']\n[1788841709, '0']\n[1788842009, '0']\n[1788842309, '0']\n[1788842609, '0']\n[1788842909, '0']\n[1788843209, '0']\n[1788843509, '0']\n[1788843809, '0']\n[1788844109, '0']\n[1788844409, '0']\n[1788844709, '0']\n[1788845009, '0']\n[1788845309, '0']\n[1788845609, '0']\n[1788845909, '0']",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "now=1788845909\nstart=$((now-10800))\necho \"=== ad p99 latency trend (getRandomAds) ===\"; curl -s -g --data-urlencode 'query=histogram_quantile(0.99, sum(rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"ad\",span_name=\"getRandomAds\"}[5m])) by (le))' --data-urlencode \"start=$start\" --data-urlencode \"end=$now\" --data-urlencode \"step=300\" 'http://localhost:9090/api/v1/query_range' | python3 -c \"import sys,json; d=json.load(sys.stdin); [print(v) for r in d['data']['result'] for v in r['values']]\" 2>/dev/null | tail -25",
+        "description": "Ad p99 latency trend over 3h"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== ad p99 latency trend (getRandomAds) ===\n[1788838709, '1.98']\n[1788839009, '3.9799999999999995']\n[1788839309, '1.98']\n[1788839609, '7.9399999999999995']\n[1788839909, '1.9799999999999998']\n[1788840209, '1.98']\n[1788840509, 'NaN']\n[1788840809, '3.9400000000000004']\n[1788841109, '1.98']\n[1788841409, '3.9800000000000004']\n[1788841709, '3.9400000000000004']\n[1788842009, '3.9799999999999995']\n[1788842309, '1.98']\n[1788842609, '1.9799999999999998']\n[1788842909, '1.98']\n[1788843209, '1.98']\n[1788843509, '1.9799999999999998']\n[1788843809, '5.94']\n[1788844109, '1.9799999999999998']\n[1788844409, '1.98']\n[1788844709, '1.9799999999999998']\n[1788845009, '1.98']\n[1788845309, '1.9800000000000002']\n[1788845609, '1.9799999999999998']\n[1788845909, '1.98']",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "mcp__aiops_rag__search_past_incidents",
+      "tool_input": {
+        "query": "kafkaQueueProblems 开关打开导致 orders 消费积压，同时怀疑 adHighCpu，实际核实开关状态",
+        "top_k": 3
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "检索到以下历史相似诊断工单（按相似度降序）：\n\n[1] 相似度=0.7549 | 服务=kafka | 类型=resource | 当时走向=feishu_low_confidence\n    根因摘要: 告警描述为 orders topic 消费 lag 持续上升、flagd 开关 kafkaQueueProblems 触发的队列积压（生产快于消费，消费者健康但算力不足），属于典型队列积压型故障（应扩容消费者以追平消费速率）。但当前沙箱环境实时核验发现：1) `docker ps` 中根本没有 kafka/checkout/accounting/fraud-detection 等相关容器（仅 ad、recommendation、flagd、jaeger、prometheus 等基础设施在跑，Up 7 分钟）；2) Prometheus 中 `kafka_consumergroup_lag`、`rate(kafka_topic_partition_current_offset[5m])` 等查询均返回空结果集，`__name__` 标签里也搜不到任何 kafka_* 指标，说明本环境未接入/未采集 kafka job；3) flagd 配置 vendor/otel-demo/src/flagd/demo.flagd.json 中 kafkaQueueProblems 的 defaultVariant 当前为 \"off\"（未被打开）；4) 告警 startsAt=2026-06-20，与当前日期 2026-08-17 相差近两个月，且容器均为近 7 分钟内新启动，与告警发生时并非同一次生命周期。综合判断：本次告警很可能是历史/失效告警，或该 flagd 故障注入场景（s3）从未在当前环境实际生效或已被回退，当前不存在真实运行中的 kafka 积压问题可供确认。即便按告警描述本身的根因（生产>消费、消费者算力不足）来看，理论止血手段是扩容消费 topic 的服务（otel-demo 中 orders topic 由 accounting/fraud-detection 消费），但 kafka broker 本身是有状态组件，且真正的消费者服务（accounting/fraud-detection）均不在低风险自动处置授权目标清单（ad, cart, checkout, currency, email, frontend, payment, quote, recommendation, shipping）内，因此无论证据是否充分，都不具备自动执行止血的条件。未执行任何处置。\n    处置: 未自动执行任何处置。若该积压属实，标准止血为扩容 orders topic 的消费者（otel-demo 中为 accounting / fraud-detection）副本数或并发度以追平生产速率；根治则需评估生产端限流或消费端批量/并发参数调优。但：(1) 当前环境未部署任何 kafka/consumer 容器、Prometheus 无 kafka_* 指标、flagd 的 kafkaQueueProblems 仍为 off，找不到实时证据支持\"积压正在发生\"；(2) 即便坐实，kafka broker 属有状态组件、accounting/fraud-detection 消费者又不在低风险自动处置授权目标清单内，扩容/重启动作命中即会被 hook 拦截。建议：人工确认该告警是否为陈旧/重复告警（startsAt 与当前时间相差近2个月），若确认环境中已重新部署 kafka 且积压复现，再由人工执行消费者扩容或联系基础设施团队处理 broker 侧问题；必要时在告警系统中手动静音此条陈旧告警。\n[2] 相似度=0.7267 | 服务=kafka（消费者：fraud-detection/accounting） | 类型=resource | 当时走向=feishu_low_confidence\n    根因摘要: 告警声称 orders topic 消费 lag 单调上升，但实时核验与此矛盾：kafka/fraud-detection/accounting/checkout 容器确实在运行（非空环境），flagd 的 kafkaQueueProblems defaultVariant 也确为 \"on\"（故障注入名义上已开启）；但 Prometheus 显示 fraud-detection 消费者对 orders 分区的 kafka_consumer_records_lag 在过去4小时(48个采样点，每5分钟一个)内恒为 0，kafka_consumer_records_lag_max 查询返回空序列，说明当前不存在正在发生的真实积压。同时 kafka 消息产出速率仅 ~0.2 msg/s、load-generator 容器仅启动 6 分钟，流量极低可能尚未触发注入效果的可观测影响。告警 startsAt=2026-06-20T10:10:00Z 与当前时间 2026-08-18、以及容器实际启动时间(Up 4小时，约08:02起)相差近两个月，时间线不吻合，符合陈旧/未在当前生命周期内实际生效的失效告警特征。deploys.log 中也无任何 kafka 相关发版记录（仅 recommendation 服务，与本告警无关）。综合判断：证据不支持\"积压正在真实发生\"，即便积压属实，kafka broker 是有状态组件、真正的消费者 fraud-detection/accounting 也不在低风险自动处置授权目标清单（ad, cart, checkout, currency, email, frontend, payment, quote, recommendation, shipping）内，理论止血（扩容/加并发消费者）本身也不会被 hook 放行，故未执行任何自动处置。\n    处置: 未执行任何自动处置。理论根因（若确实发生）：生产速率持续超过消费速率、消费者算力/并发不足，标准止血是扩容 orders topic 消费者（otel-demo 中为 fraud-detection/accounting）副本数或并发度以追平生产速率。但当前不具备执行条件：(1) 实时观测 kafka_consumer_records_lag{topic=\"orders\"} 过去4小时恒为0，未见积压正在发生；(2) 即便坐实，kafka broker 属有状态组件、fraud-detection/accounting 也不在低风险自动处置授权目标清单（ad, cart, checkout, currency, email, frontend, payment, quote, recommendation, shipping）内，扩容/重启动作本身命中即会被 hook 拦截（docker restart/update/compose/exec 等变更类命令均在本次调查中被 hook 明确拒绝）。建议：(a) 人工确认该告警是否为陈旧告警（startsAt 与当前容器生命周期相差近两个月）并考虑静音；(b) 若怀疑注入生效但流量不足以体现，可待 load-generator 稳定运行更长时间后复查 kafka_consumer_records_lag 是否出现真实上升趋势；(c) 若后续复现真实积压，标准处置为人工扩容 fraud-detection/accounting 副本数或消费并发度，根治需评估生产端限流/消费端批处理参数（code_fix）。\n[3] 相似度=0.7249 | 服务=kafka | 类型=resource | 当时走向=feishu_low_confidence\n    根因摘要: 告警描述 orders topic Kafka 消费 lag 持续上升（flagd kafkaQueueProblems 触发，生产快于消费、消费者健康但算力不足），理论上是典型队列积压故障。但当前环境实时核验与告警描述不符：docker ps 中无任何 kafka/orders 消费者相关容器（accounting、fraud-detection、checkout 均未运行，仅 ad、recommendation 等基础设施在跑，且均为近11小时/23分钟内启动）；Prometheus `__name__` 标签中查不到任何 kafka_* 指标，说明当前环境未部署/未采集 Kafka；flagd 配置文件 vendor/otel-demo/src/flagd/demo.flagd.json 第49-57行显示 kafkaQueueProblems 的 defaultVariant 为 \"off\"（故障从未被实际注入或已回退）；告警 startsAt=2026-06-20T10:10:00Z 与当前时间 2026-08-18 相差近两个月，且容器生命周期不匹配。结合历史工单检索（4条高相似度案例均得出相同结论），判断本次为陈旧/未实际生效的失效告警，当前不存在可确认的真实 Kafka 积压问题，无法坐实\"正在发生\"的根因，未执行任何处置。\n    处置: 未执行任何自动处置（证据不足 + 不具备执行条件）。核验结论：(1) docker ps 无 kafka/accounting/fraud-detection/checkout 等相关容器运行；(2) Prometheus 无任何 kafka_* 指标，kafka_consumergroup_lag 查询返回空；(3) flagd 配置 vendor/otel-demo/src/flagd/demo.flagd.json:49-57 中 kafkaQueueProblems 的 defaultVariant 仍为 \"off\"，故障场景未实际触发；(4) 告警时间 startsAt=2026-06-20 与当前 2026-08-18 相差近两个月，与当前容器生命周期（Up 11h/23m）不一致。即便按告警描述的理论根因（生产速率>消费速率、消费者算力不足）推演，标准止血是扩容 orders topic 消费者（otel-demo 中为 accounting/fraud-detection）副本数或并发度；但 kafka broker 本身是有状态组件，且真正的消费者服务 accounting/fraud-detection 均不在低风险自动处置授权目标清单（ad, cart, checkout, currency, email, frontend, payment, quote, recommendation, shipping）内，扩容/重启动作命中即会被 hook 拦截。建议：人工确认该告警是否为陈旧/重复告警并在告警系统中静音；若需复现验证，需人工手动将 kafkaQueueProblems 置为 on 并重新部署 kafka/accounting/fraud-detection 相关容器后再排查，根治则需评估生产端限流或消费端批量/并发参数调优。\n\n注意：历史工单仅供参考，请结合当前实时观测证据独立判断，不要盲目照搬。",
+      "signal_types_covered": [
+        "prometheus",
+        "jaeger",
+        "logs",
+        "kubectl_status",
+        "rag_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "告警怀疑的两个开关经 flagd OFREP 权威核实：kafkaQueueProblems 确为 ON（value=100），adHighCpu 确为 OFF——两故障并非同一次误操作。kafkaQueueProblems 虽已开启（注入消费延迟的名义故障），但 fraud-detection 对 orders topic 的 kafka_consumer_records_lag 在过去3h（每5min采样）恒为0、kafka_lag_max=0，未观测到真实积压（load-generator 仅启动6min、流量低尚未体现注入影响）。adHighCpu 开关为关闭，ad 服务 getRandomAds p99 稳定在~2ms、仅2-8ms正常抖动，无 CPU 问题——第二个怀疑不成立。处置顺序：仅需处理 kafkaQueueProblems（关闭该 flagd 开关），ad 无需动作。该关闭动作属配置类线上操作，但 flagd/kafka/fraud-detection 均不在低风险自动处置白名单，交人工执行，未自动处置。",
+        "kind": "config",
+        "suspect_service": "kafka",
+        "remediation_type": "online_op",
+        "remediation_detail": "根治即误操作回退：人工将 flagd 中 kafkaQueueProblems 开关由 on 置回 off（defaultVariant=off），消除注入到 orders 消费端的处理延迟。该动作不在低风险自动处置白名单（flagd 配置变更、kafka 为有状态组件、消费者 fraud-detection/accounting 不在授权目标清单 ad/cart/checkout/currency/email/frontend/payment/quote/recommendation/shipping 内），故未自动执行，交人工/发卡处理。adHighCpu 开关经核实已是 off、ad 延迟正常，无需任何处置。补充：当前 orders topic 消费 lag 实测恒为0、无正在发生的真实积压，故无需扩容消费者；若关闭开关后仍需验证，可待流量上来后复查 kafka_consumer_records_lag 趋势。",
+        "confidence": 0.72,
+        "also_code_fix": false,
+        "suspect_repo": null,
+        "suspect_commit_hint": null,
+        "suspect_file_hint": null,
+        "evidence": [
+          "flagd OFREP: POST /ofrep/v1/evaluate/flags/kafkaQueueProblems 返回 {\"value\":100,\"variant\":\"on\",\"reason\":\"STATIC\"} —— kafkaQueueProblems 开关确为开启（权威实时值）",
+          "flagd OFREP: POST /ofrep/v1/evaluate/flags/adHighCpu 返回 {\"value\":false,\"variant\":\"off\",\"reason\":\"STATIC\"} —— adHighCpu 开关实为关闭，值班对第二个开关的怀疑不成立，两故障非同一次误操作",
+          "Prometheus query_range kafka_consumer_records_lag{service_name=\"fraud-detection\",topic=\"orders\"} 过去3h(step=300s,25个采样点)恒为 '0'；即时查询 kafka_lag_max=0 —— 尽管开关开启，当前无真实消费积压",
+          "Prometheus query_range histogram_quantile(0.99, rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"ad\",span_name=\"getRandomAds\"}[5m])) 过去3h稳定在~1.98ms，仅偶发3.9-7.9ms抖动 —— ad 延迟正常，无 CPU 打满特征",
+          "docker ps -a: kafka Up 3h(healthy)、ad Up 13h、checkout Up 5h、load-generator Up 6min —— load-generator 刚启动、流量低，可解释开关开启但注入影响尚未体现为可观测 lag",
+          "历史工单[2]相似度0.73同款结论：kafkaQueueProblems defaultVariant=on 但 fraud-detection orders lag 恒为0，与本次实时观测一致，佐证'开关名义开启但无真实积压'",
+          "未执行任何自动处置：关闭 flagd 开关/扩容 kafka/动 fraud-detection 均不在低风险白名单，命中即被 hook 拦，交人工"
+        ]
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "prometheus",
+        "kubectl_status",
+        "rag_history"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ]
+}

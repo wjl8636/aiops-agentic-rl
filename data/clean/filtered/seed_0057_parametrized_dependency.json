@@ -1,0 +1,15 @@
+{
+  "alertname": "DependencyFailureRate",
+  "service": "payment",
+  "labels": {
+    "service": "payment",
+    "severity": "warning",
+    "job": "paymentservice"
+  },
+  "annotations": {
+    "summary": "payment 依赖调用错误率上升",
+    "description": "上游服务调用 payment 时错误率明显上升，根因指向 flagd 开关 paymentFailure（payment 服务按比例拒绝扣款请求）。这次异常和代码变更无关——近期没有发版，是开关状态变化直接导致 payment 对外响应失败/超时。"
+  },
+  "startsAt": "2026-07-03T03:00:00Z",
+  "scenario_hint": "[参数化扩增/dependency] flag=paymentFailure service=payment severity=warning：验证依赖故障场景在不同服务/severity/时间窗下的泛化"
+}

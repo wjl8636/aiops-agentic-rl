@@ -1,0 +1,15 @@
+{
+  "alertname": "RecommendationWarmupSnapshotMemoryGrowth",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 内存占用持续上升，怀疑是新上线的预热任务导致",
+    "description": "recommendation 团队上周上线了一个定时预热任务，每隔几分钟运行一次，作用是把当前热销榜的商品快照追加进一个模块级 list 里，供后续请求快速读取，但每次追加前忘记清空上一次的旧快照，list 长度只增不减。上线以来内存占用持续单调爬升，怀疑最终会被 OOMKilled。docker stats 采样显示内存曲线平滑向上、没有阶跃，deploys.log显示这次上线是唯一的相关变更，没有伴随代码回滚。"
+  },
+  "startsAt": "2026-09-06T11:00:00Z",
+  "scenario_hint": "[历史工单反演/static] source_ticket=hist-2026-09-recommendation-warmup-snapshot-leak：2026-09 补充批次，手写历史工单摘要反向抽取的告警（定时预热任务无界 list 泄漏，无对应 flagd flag，故意不写 flag=，依赖 _inject_historical_fault() 的内存/OOM 关键词兜底路由到真实泄漏 fixture）"
+}

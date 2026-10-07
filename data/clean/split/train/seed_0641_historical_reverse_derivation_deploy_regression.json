@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0055-recommendation-deploy_regression",
+    "description": "recommendation 服务当前 CPU/内存/连接指标均正常（docker stats: CPU 1.27%, Mem 25.32MiB/256MiB），Prometheus 中无该 job 的 up/5xx 时间序列数据，Jaeger 也无可用 trace 数据可关联\"偶发返回下架商品ID\"的具体请求。代码审查显示 workspace/recommendation/recommendation_server.py 的 get_recommendations 仅从静态内存目录 CATALOG(PRODUCT-0..19) 中过滤已在输入内的 ID 返回候选，逻辑中不存在排序/权重逻辑，也不存在\"下架商品\"这一概念，因此用户所述的\"排序逻辑bug\"在当前代码路径中无法定位到对应缺陷点。仓库内 pytest 全绿(2 passed)，没有可复现失败用例支撑修复验证。历史相似工单（search_past_incidents）虽命中 recommendation 服务的既往事件，但均为发版后内存泄漏引发 OOM 的不同故障模式，与本次\"无OOM无5xx、仅业务侧观察到结果异常\"的现象不符，判断为不适用的历史噪音。综合结论：无法在代码/指标/链路层面找到与告警描述匹配的真实缺陷，建议交由人工复核用户反馈的具体案例（如具体请求ID、时间点、返回的下架商品ID)以判断是否为目录/库存数据不一致或前端展示问题，而非本仓库当前排序代码的缺陷；自动修复因缺乏可验证的失败用例而不应贸然提交。"
+  },
+  "startsAt": "2026-07-22T02:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0055-recommendation-deploy_regression：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

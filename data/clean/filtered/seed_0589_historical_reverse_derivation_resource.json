@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "warning",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0048-kafka-resource",
+    "description": "告警描述为 orders topic 消费 lag 持续上升、flagd 开关 kafkaQueueProblems 触发的队列积压（生产快于消费，消费者健康但算力不足），属于典型队列积压型故障（应扩容消费者以追平消费速率）。但当前沙箱环境实时核验发现：1) `docker ps` 中根本没有 kafka/checkout/accounting/fraud-detection 等相关容器（仅 ad、recommendation、flagd、jaeger、prometheus 等基础设施在跑，Up 7 分钟）；2) Prometheus 中 `kafka_consumergroup_lag`、`rate(kafka_topic_partition_current_offset[5m])` 等查询均返回空结果集，`__name__` 标签里也搜不到任何 kafka_* 指标，说明本环境未接入/未采集 kafka job；3) flagd 配置 vendor/otel-demo/src/flagd/demo.flagd.json 中 kafkaQueueProblems 的 defaultVariant 当前为 \"off\"（未被打开）；4) 告警 startsAt=2026-06-20，与当前日期 2026-08-17 相差近两个月，且容器均为近 7 分钟内新启动，与告警发生时并非同一次生命周期。综合判断：本次告警很可能是历史/失效告警，或该 flagd 故障注入场景（s3）从未在当前环境实际生效或已被回退，当前不存在真实运行中的 kafka 积压问题可供确认。即便按告警描述本身的根因（生产>消费、消费者算力不足）来看，理论止血手段是扩容消费 topic 的服务（otel-demo 中 orders topic 由 accounting/fraud-detection 消费），但 kafka broker 本身是有状态组件，且真正的消费者服务（accounting/fraud-detection）均不在低风险自动处置授权目标清单（ad, cart, checkout, currency, email, frontend, payment, quote, recommendation, shipping）内，因此无论证据是否充分，都不具备自动执行止血的条件。未执行任何处置。"
+  },
+  "startsAt": "2026-07-20T11:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0048-kafka-resource：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

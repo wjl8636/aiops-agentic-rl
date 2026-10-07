@@ -1,0 +1,8 @@
+{
+  "remediation_type": "online_op",
+  "suspect_service": "recommendation",
+  "expect_route": "auto_remediated_and_code_fix_pr",
+  "expect_kind_any_of": [
+    "deploy_regression"
+  ]
+}

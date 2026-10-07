@@ -1,0 +1,322 @@
+{
+  "alert": {
+    "alertname": "AdLatencyCascadingTimeout",
+    "service": "ad",
+    "labels": {
+      "service": "ad",
+      "severity": "critical",
+      "job": "adservice"
+    },
+    "annotations": {
+      "summary": "ad 延迟劣化导致首页广告位大面积超时",
+      "description": "ad 服务响应延迟持续恶化，首页广告位大面积超时返回兜底空白，广告收入监控曲线明显下滑。ad 容器的常规资源读数（CPU/内存）都在正常范围，但延迟问题真实存在且持续恶化，怀疑是adHighCpu 负载注入开关被打开——指标读数与业务表现不一致，请多信源交叉验证后定位。"
+    },
+    "startsAt": "2026-09-07T09:35:00Z",
+    "scenario_hint": "[v9增强/B1a_交叉验证] flags=adHighCpu：注入真实故障但观测信号降级（Prometheus lag 冻结/ad 机制不生效/后端不可观测），OFREP 是权威第一信源——验证「OFREP 查 flag → Prometheus 读数正常不据此否定 → 换第二信源交叉验证 → 收敛输出 kind/route/confidence，不执行白名单外操作」"
+  },
+  "alert_id": "seed_0730_v9_aug_B1a_resource",
+  "final_diagnosis": {
+    "summary": "ad 服务延迟劣化的根因是 flagd 功能开关 adHighCpu 被置为 on（负载注入生效）。OFREP 权威读数确认 adHighCpu=true(variant=on)；虽然 docker/JVM 的 CPU 平均读数偏低(0.36%/0.2%)与\"高CPU\"字面矛盾，但用第二信源交叉验证后确认业务症状真实：告警窗口内 GetAds p99 从 ~49ms 基线间歇性飙升至 139/160/320ms，且存在真实流量(GetAds calls=57939、日志持续、load-generator 在跑)。故这是活跃故障（区别于历史上 flag=off、无流量的陈旧告警）。根因即注入开关本身，属功能开关注入的 CPU/延迟症状。止血手段是在 flagd 关闭 adHighCpu 开关——属改配置的高风险操作、不在低风险白名单，故未自动执行，交人工；白名单内的 restart ad 对 flagd 侧开关无效（重启后经 EventStream 重新读到 on 会复现），故也未执行。",
+    "kind": "resource",
+    "suspect_service": "ad",
+    "suspect_repo": null,
+    "suspect_commit_hint": null,
+    "suspect_file_hint": null,
+    "remediation_type": "online_op",
+    "remediation_detail": "根因：flagd 功能开关 adHighCpu 当前为 on（负载注入），导致 ad 处理路径间歇性 CPU 负载注入、GetAds p99 延迟劣化、首页广告位超时。止血动作（需人工执行，属高风险改配置、不在低风险白名单，我未自动执行）：在 flagd 配置中把 adHighCpu 的 defaultVariant 置回 off（或通过管理面关闭该 flag），ad 会经 flagd EventStream 感知并卸掉注入负载，p99 即恢复至 ~49ms 基线。说明：白名单内的 docker restart ad 对本故障无效——开关状态在 flagd 服务端，重启后 ad 重连 flagd 仍读到 adHighCpu=on 会立即复现，故未执行任何白名单操作。无需改代码（非代码回归，纯开关注入）。",
+    "confidence": 0.78,
+    "evidence": [
+      "OFREP 实时权威值(证据核心)：POST http://localhost:8016/ofrep/v1/evaluate/flags/adHighCpu 返回 {\"value\":true,\"variant\":\"on\",\"reason\":\"STATIC\"} —— 注入开关确实处于 on。同时 adManualGc=off、adFailure=off，排除其它 ad 注入开关。",
+      "矛盾信号交叉验证：docker stats --no-stream ad 显示 CPU 仅 0.36%、jvm_cpu_recent_utilization_ratio{service_name=\"ad\"}=0.00197(~0.2%)，字面与'高CPU'矛盾；但未据此单点否定告警，改用第二信源确认症状真实。",
+      "业务症状二次佐证(Prometheus query_range)：histogram_quantile(0.99, rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"ad\",span_name=\"oteldemo.AdService/GetAds\"}[5m])) 在告警窗口内从 ~49ms 基线间歇飙升至 139/160/125/320ms，延迟劣化真实存在。",
+      "活跃故障判据(区别于历史陈旧告警)：ad 容器 Up 15h、RestartCount=0、OOMKilled=false；存在真实流量——traces_span_metrics_calls_total GetAds=57939、docker logs ad 持续输出请求、load-generator 容器在运行。历史相似工单[1][2]为 flag=off+无流量的陈旧告警(未处置)，本次 flag=on+有流量+p99真实抬升，性质不同。",
+      "未自动处置的判定：真正止血=在 flagd 关闭 adHighCpu，属改配置高风险、不在低风险白名单(restart/migrate/scale)，交人工；白名单内 docker restart ad 无效(开关在 flagd 服务端，重启后经 EventStream 复读 on 会复现)，故未执行任何白名单命令，执行台账应为空。",
+      "分类依据：症状为功能开关注入引发的 CPU/延迟(资源/容量类)症状，按口径归为 resource(即使由 flag 注入)；非代码回归，故 also_code_fix=false、无 suspect_repo/commit/file(ad 源码未克隆到 workspace，也无需)。"
+    ],
+    "time_window": {
+      "from": "2026-09-07T09:35:00Z",
+      "to": "2026-09-08T07:56:00Z"
+    },
+    "also_code_fix": false,
+    "executed_actions": []
+  },
+  "ground_truth": null,
+  "route": "feishu_online_op",
+  "post_action_health": null,
+  "meta": {
+    "source": "real",
+    "degraded": null,
+    "raw": "{\"summary\":\"ad 服务延迟劣化的根因是 flagd 功能开关 adHighCpu 被置为 on（负载注入生效）。OFREP 权威读数确认 adHighCpu=true(variant=on)；虽然 docker/JVM 的 CPU 平均读数偏低(0.36%/0.2%)与\\\"高CPU\\\"字面矛盾，但用第二信源交叉验证后确认业务症状真实：告警窗口内 GetAds p99 从 ~49ms 基线间歇性飙升至 139/160/320ms，且存在真实流量(GetAds calls=57939、日志持续、load-generator 在跑)。故这是活跃故障（区别于历史上 flag=off、无流量的陈旧告警）。根因即注入开关本身，属功能开关注入的 CPU/延迟症状。止血手段是在 flagd 关闭 adHighCpu 开关——属改配置的高风险操作、不在低风险白名单，故未自动执行，交人工；白名单内的 restart ad 对 flagd 侧开关无效（重启后经 EventStream 重新读到 on 会复现），故也未执行。\",\"kind\":\"resource\",\"suspect_service\":\"ad\",\"remediation_type\":\"online_op\",\"remediation_detail\":\"根因：flagd 功能开关 adHighCpu 当前为 on（负载注入），导致 ad 处理路径间歇性 CPU 负载注入、GetAds p99 延迟劣化、首页广告位超时。止血动作（需人工执行，属高风险改配置、不在低风险白名单，我未自动执行）：在 flagd 配置中把 adHighCpu 的 defaultVariant 置回 off（或通过管理面关闭该 flag），ad 会经 flagd EventStream 感知并卸掉注入负载，p99 即恢复至 ~49ms 基线。说明：白名单内的 docker restart ad 对本故障无效——开关状态在 flagd 服务端，重启后 ad 重连 flagd 仍读到 adHighCpu=on 会立即复现，故未执行任何白名单操作。无需改代码（非代码回归，纯开关注入）。\",\"confidence\":0.78,\"also_code_fix\":false,\"suspect_repo\":null,\"suspect_commit_hint\":null,\"suspect_file_hint\":null,\"time_window\":{\"from\":\"2026-09-07T09:35:00Z\",\"to\":\"2026-09-08T07:56:00Z\"},\"evidence\":[\"OFREP 实时权威值(证据核心)：POST http://localhost:8016/ofrep/v1/evaluate/flags/adHighCpu 返回 {\\\"value\\\":true,\\\"variant\\\":\\\"on\\\",\\\"reason\\\":\\\"STATIC\\\"} —— 注入开关确实处于 on。同时 adManualGc=off、adFailure=off，排除其它 ad 注入开关。\",\"矛盾信号交叉验证：docker stats --no-stream ad 显示 CPU 仅 0.36%、jvm_cpu_recent_utilization_ratio{service_name=\\\"ad\\\"}=0.00197(~0.2%)，字面与'高CPU'矛盾；但未据此单点否定告警，改用第二信源确认症状真实。\",\"业务症状二次佐证(Prometheus query_range)：histogram_quantile(0.99, rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\\\"ad\\\",span_name=\\\"oteldemo.AdService/GetAds\\\"}[5m])) 在告警窗口内从 ~49ms 基线间歇飙升至 139/160/125/320ms，延迟劣化真实存在。\",\"活跃故障判据(区别于历史陈旧告警)：ad 容器 Up 15h、RestartCount=0、OOMKilled=false；存在真实流量——traces_span_metrics_calls_total GetAds=57939、docker logs ad 持续输出请求、load-generator 容器在运行。历史相似工单[1][2]为 flag=off+无流量的陈旧告警(未处置)，本次 flag=on+有流量+p99真实抬升，性质不同。\",\"未自动处置的判定：真正止血=在 flagd 关闭 adHighCpu，属改配置高风险、不在低风险白名单(restart/migrate/scale)，交人工；白名单内 docker restart ad 无效(开关在 flagd 服务端，重启后经 EventStream 复读 on 会复现)，故未执行任何白名单命令，执行台账应为空。\",\"分类依据：症状为功能开关注入引发的 CPU/延迟(资源/容量类)症状，按口径归为 resource(即使由 flag 注入)；非代码回归，故 also_code_fix=false、无 suspect_repo/commit/file(ad 源码未克隆到 workspace，也无需)。\"]}",
+    "teacher_model": "claude-4.8-opus-google",
+    "usage": {
+      "input_tokens": 2952,
+      "output_tokens": 11179,
+      "cache_creation_input_tokens": 86002,
+      "cache_read_input_tokens": 263086
+    },
+    "cost_usd": 0.9632905000000002,
+    "num_turns": 17,
+    "duration_ms": 168002,
+    "model_usage": {
+      "claude-4.8-opus-google": {
+        "inputTokens": 2952,
+        "outputTokens": 11179,
+        "cacheReadInputTokens": 263086,
+        "cacheCreationInputTokens": 86002,
+        "webSearchRequests": 0,
+        "costUSD": 0.9632905000000002,
+        "contextWindow": 200000,
+        "maxOutputTokens": 32000,
+        "canonicalModel": "claude-4.8-opus-google",
+        "provider": "firstParty"
+      }
+    },
+    "pruning": {
+      "steps_before": 15,
+      "steps_after": 15,
+      "removed": [],
+      "restored_by_verification": []
+    }
+  },
+  "steps": [
+    {
+      "tool_name": "Skill",
+      "tool_input": {
+        "skill": "resource-cpu"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Launching skill: resource-cpu",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker ps -a --format '{{.Names}}\\t{{.Status}}' | grep -i ad",
+        "description": "List ad-related containers"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "load-generator\tUp 7 minutes\nad\tUp 15 hours",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s -X POST 'http://localhost:8016/ofrep/v1/evaluate/flags/adHighCpu' -H 'Content-Type: application/json' -d '{}'",
+        "description": "Query adHighCpu flag current value via OFREP"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"value\":true,\"key\":\"adHighCpu\",\"reason\":\"STATIC\",\"variant\":\"on\",\"metadata\":{}}",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker stats --no-stream ad; echo \"---restart/oom---\"; docker inspect --format '{{.RestartCount}} {{.State.OOMKilled}}' ad",
+        "description": "Check ad container live CPU/mem and restart/oom"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "CONTAINER ID   NAME      CPU %     MEM USAGE / LIMIT   MEM %     NET I/O          BLOCK I/O         PIDS\nb25f17aecb4f   ad        0.36%     242.6MiB / 300MiB   80.88%    24.2MB / 116MB   29.2MB / 73.2MB   39\n---restart/oom---\n0 false",
+      "signal_types_covered": [
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "curl -s --data-urlencode 'query={service_name=\"ad\"}' 'http://localhost:9090/api/v1/query' | head -c 3000; echo",
+        "description": "List metrics exposed by ad service"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"instance\":\"77d8a26e-1958-47df-a890-ff99aca7eb55\",\"job\":\"opentelemetry-demo/ad\",\"le\":\"10000\",\"service_instance_id\":\"77d8a26e-1958-47df-a890-ff99aca7eb55\",\"service_name\":\"ad\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"flagd.evaluation.v2.Service/ResolveBoolean\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788854201.833,\"93297\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_count\",\"instance\":\"1ca98097-fb94-4406-a285-a13e5ba87424\",\"job\":\"opentelemetry-demo/ad\",\"service_instance_id\":\"1ca98097-fb94-4406-a285-a13e5ba87424\",\"service_name\":\"ad\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_INTERNAL\",\"span_name\":\"getRandomAds\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788854201.833,\"154\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"instance\":\"1ca98097-fb94-4406-a285-a13e5ba87424\",\"job\":\"opentelemetry-demo/ad\",\"le\":\"800\",\"service_instance_id\":\"1ca98097-fb94-4406-a285-a13e5ba87424\",\"service_name\":\"ad\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_INTERNAL\",\"span_name\":\"getRandomAds\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788854201.833,\"154\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"instance\":\"567440b0-0780-43ce-ac41-d20f08210e54\",\"job\":\"opentelemetry-demo/ad\",\"le\":\"8\",\"service_instance_id\":\"567440b0-0780-43ce-ac41-d20f08210e54\",\"service_name\":\"ad\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"resolve\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788854201.833,\"89\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"instance\":\"567440b0-0780-43ce-ac41-d20f08210e54\",\"job\":\"opentelemetry-demo/ad\",\"le\":\"5000\",\"service_instance_id\":\"567440b0-0780-43ce-ac41-d20f08210e54\",\"service_name\":\"ad\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_CLIENT\",\"span_name\":\"flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788854201.833,\"4\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_sum\",\"instance\":\"1ca98097-fb94-4406-a285-a13e5ba87424\",\"job\":\"opentelemetry-demo/ad\",\"service_instance_id\":\"1ca98097-fb94-4406-a285-a13e5ba87424\",\"service_name\":\"ad\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_INTERNAL\",\"span_name\":\"getRandomAds\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788854201.833,\"100.17551999999999\"]},{\"metric\":{\"__name__\":\"traces_span_metrics_duration_milliseconds_bucket\",\"instance\":\"77d8a26e-1958-47df-a890-ff99aca7eb55\",\"job\":\"opentelemetry-demo/ad\",\"le\":\"15000\",\"service_instance_id\":\"77d8a26e-1958-47df-a890-ff99aca7eb55\",\"service_name\":\"ad\",\"service_namespace\":\"opentelemetry-demo\",\"span_kind\":\"SPAN_KIND_SERVER\",\"span_name\":\"oteldemo.AdService/GetAds\",\"status_code\":\"STATUS_CODE_UNSET\"},\"value\":[1788854201.833,\"31099\"]}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== JVM CPU ratio ===\"; curl -s --data-urlencode 'query=jvm_cpu_recent_utilization_ratio{service_name=\"ad\"}' 'http://localhost:9090/api/v1/query'; echo; echo \"=== p99 latency GetAds (ms) ===\"; curl -s --data-urlencode 'query=histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"ad\",span_name=\"oteldemo.AdService/GetAds\"}[5m])))' 'http://localhost:9090/api/v1/query'; echo",
+        "description": "Query JVM CPU ratio and p99 latency for ad GetAds"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== JVM CPU ratio ===\n{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"__name__\":\"jvm_cpu_recent_utilization_ratio\",\"instance\":\"fcb7aa50-923c-4d2f-ac97-1eac02a36417\",\"job\":\"opentelemetry-demo/ad\",\"service_instance_id\":\"fcb7aa50-923c-4d2f-ac97-1eac02a36417\",\"service_name\":\"ad\",\"service_namespace\":\"opentelemetry-demo\"},\"value\":[1788854212.291,\"0.001965531975502065\"]}]}}\n=== p99 latency GetAds (ms) ===\n{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{},\"value\":[1788854212.344,\"79.25000000000004\"]}]}}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "docker logs ad --tail 60 2>&1 | tail -40",
+        "description": "Tail ad container logs"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "2026-09-08 07:55:41 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=47bcae0e690a4e92a28381cbef2bd75d span_id=81144b590e03fe3c trace_flags=01 \n2026-09-08 07:55:44 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=3d2218c38b6052ffbaa2785370a3f929 span_id=101b21259125b660 trace_flags=01 \n2026-09-08 07:55:44 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=8c768ae2193634c1ef86e27443903c6c span_id=eec417a24af1f629 trace_flags=01 \n2026-09-08 07:55:49 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=4337c6d46e20a56c2792ad86f6e92b0e span_id=fadec1522b25d0a9 trace_flags=01 \n2026-09-08 07:55:49 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=ca1fd9cc33f82a44ef6c69585a852875 span_id=0bcbc94dc569bf73 trace_flags=01 \n2026-09-08 07:55:54 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=8c9ffd8959b48ce2af98ceeb9d5a5138 span_id=c9fa7860222bd548 trace_flags=01 \n2026-09-08 07:55:54 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=1232f710371d7a9eddd45cc803aded8b span_id=64f2ee88bea1eb81 trace_flags=01 \n2026-09-08 07:55:54 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=6a74d1bafe50048b875cf1271f0c7f23 span_id=4d9f1c3fd34bcde5 trace_flags=01 \n2026-09-08 07:55:54 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=939909a1518e9b576778e8548b00897b span_id=84c3cb5536983f8c trace_flags=01 \n2026-09-08 07:55:55 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=696a4125b1d4dac79fc60a9da1a187c8 span_id=4e096680164bd740 trace_flags=01 \n2026-09-08 07:55:55 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=31a2de0269a0cf2ef6b7ccf5358fe82d span_id=00f978cfad5fac44 trace_flags=01 \n2026-09-08 07:56:03 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=754689e2f8431c11716ae55259ae1951 span_id=c6ddf9dce08a43cd trace_flags=01 \n2026-09-08 07:56:03 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=6c7a8776391f793533d94adc629a25e5 span_id=5dda66e3b96cb415 trace_flags=01 \n2026-09-08 07:56:04 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=13065f409fb116de3351d27139079836 span_id=e972d8761302f4d2 trace_flags=01 \n2026-09-08 07:56:04 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=fcb198613240f51b9f5db5a9b25ed0f9 span_id=3a9ac0d3e7dc9759 trace_flags=01 \n2026-09-08 07:56:07 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=ad7ad1998f3b105af3d2801c20e9db45 span_id=7e94cfb43e2eda4b trace_flags=01 \n2026-09-08 07:56:08 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=dcaf2fbba48fd2c5f5efbed781726058 span_id=347fbcf7a8c36385 trace_flags=01 \n2026-09-08 07:56:08 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=044ab0bf1a6943e2f1995242a23de67f span_id=a1c900f1835b2200 trace_flags=01 \n2026-09-08 07:56:08 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=1b21747f00774f5e94a49a80f6912d0f span_id=5b4b854dca72fccc trace_flags=01 \n2026-09-08 07:56:15 - oteldemo.AdService - no baggage found in context trace_id=a0c4f4de6db857b9287b256c5efc8a47 span_id=b453209fad56587b trace_flags=01 \n2026-09-08 07:56:16 - oteldemo.AdService - Targeted ad request received for [books] trace_id=a0c4f4de6db857b9287b256c5efc8a47 span_id=b453209fad56587b trace_flags=01 \n2026-09-08 07:56:16 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=e0b3c291161b73629c3ece9af4d2a0f9 span_id=d8f1ecb32b48e115 trace_flags=01 \n2026-09-08 07:56:16 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=61c8578cb556de02e301034b51822f6b span_id=f8d13ecf14c333d2 trace_flags=01 \n2026-09-08 07:56:17 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=4a29253dfc20c890a46d6df202df1b36 span_id=0795df779d9b2a82 trace_flags=01 \n2026-09-08 07:56:19 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=91cfd3e4e34c7a414bd6c83409c5b7c2 span_id=8ec26d08ff6f7fe6 trace_flags=01 \n2026-09-08 07:56:23 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=e4e31cbde6a98b038256a2e1b7a010ef span_id=7e9bd90697de8275 trace_flags=01 \n2026-09-08 07:56:24 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=9ec35ef7488c7d161046dd888dfd6abc span_id=3abd9541e8d26b19 trace_flags=01 \n2026-09-08 07:56:24 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=f7c51ed7f594756bad7cdb53a793f0fa span_id=4d902d22e2f96a43 trace_flags=01 \n2026-09-08 07:56:24 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=29fd12131dac322f839b3bcbb8fa128a span_id=d7bdde8bfb68535e trace_flags=01 \n2026-09-08 07:56:24 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=c822b5051f4a8311a2613e2d16a21690 span_id=6d7b046fe341a643 trace_flags=01 \n2026-09-08 07:56:29 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=e01344422a1f431f1fc7ef4865df5490 span_id=957b42e6c349268b trace_flags=01 \n2026-09-08 07:56:29 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=960807616ef2229e4b00a5eaaa884b83 span_id=916b0db61677a172 trace_flags=01 \n2026-09-08 07:56:33 - oteldemo.AdService - no baggage found in context trace_id=148470476dc4e023dcf76267d6c324ef span_id=2d4bec2e4206375a trace_flags=01 \n2026-09-08 07:56:33 - oteldemo.AdService - Targeted ad request received for [accessories] trace_id=148470476dc4e023dcf76267d6c324ef span_id=2d4bec2e4206375a trace_flags=01 \n2026-09-08 07:56:34 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=09ca47b8126b18b6a6c5fab750f7cdc0 span_id=31e5930aeba88601 trace_flags=01 \n2026-09-08 07:56:34 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=2b3589e20ed9eb07e6292a114a954941 span_id=bfcde4c770d9e7c7 trace_flags=01 \n2026-09-08 07:56:38 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=57fe2de929d5b28290486a97f0bb79f7 span_id=fb4a19320e75dce8 trace_flags=01 \n2026-09-08 07:56:38 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=0951c2d9f77b8d12fe34e17c4a177fb7 span_id=f391ced35bea018a trace_flags=01 \n2026-09-08 07:56:46 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=7afce320faaec2e55347317fe736c9c0 span_id=981a17683c88e7ce trace_flags=01 \n2026-09-08 07:56:46 - oteldemo.AdService - Targeted ad request received for [binoculars] trace_id=e3c10654e80b44bf00ec97e75e49aa3b span_id=26e9db978e0b1dac trace_flags=01",
+      "signal_types_covered": [
+        "logs"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd workspace/ad 2>/dev/null && rg -il \"highcpu\\|cpu\" src 2>/dev/null | head; echo \"=== search adHighCpu / cpu load ===\"; rg -rin \"adHighCpu\\|CPULoad\\|highCpu\\|BigDecimal\\|while.*true\\|Thread\" workspace/ad/src 2>/dev/null | head -40",
+        "description": "Search ad source for adHighCpu handling"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== search adHighCpu / cpu load ===",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== cpu throttling / limits ===\"; docker inspect --format '{{.HostConfig.NanoCpus}} cpus | {{.HostConfig.Memory}} memlimit' ad; echo \"=== latency p99 range over alert window ===\"; curl -s --data-urlencode 'query=histogram_quantile(0.99, sum by (le) (rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"ad\",span_name=\"oteldemo.AdService/GetAds\"}[5m])))' --data-urlencode 'start=1788770100' --data-urlencode 'end=1788854400' --data-urlencode 'step=1200' 'http://localhost:9090/api/v1/query_range' | head -c 1500; echo",
+        "description": "Check CPU limits and latency trend over window"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== cpu throttling / limits ===\n0 cpus | 314572800 memlimit\n=== latency p99 range over alert window ===\n{\"status\":\"success\",\"data\":{\"resultType\":\"matrix\",\"result\":[{\"metric\":{},\"values\":[[1788840900,\"66.99999999999936\"],[1788842100,\"52.24999999999955\"],[1788843300,\"49.675862068965515\"],[1788844500,\"49.32075471698113\"],[1788845700,\"49.46415094339621\"],[1788846900,\"49.35593220338982\"],[1788848100,\"139.00000000000196\"],[1788849300,\"160.99999999999937\"],[1788850500,\"125.99999999999982\"],[1788851700,\"95.39999999999996\"],[1788852900,\"320.9999999999999\"],[1788854100,\"49.690909090909095\"]]}]}}",
+      "signal_types_covered": [
+        "prometheus",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "cd workspace/ad && echo \"=== files ===\"; git log --oneline -8; echo \"=== grep flag names ===\"; rg -rin \"HighCpu|CpuLoad|cpu|Feature|getRandomAds|Thread|BigInteger|Fibonacci|busy\" src --glob '*.java' 2>/dev/null | head -50",
+        "description": "Inspect ad source and git log"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "(eval):cd:1: no such file or directory: workspace/ad\n8c4ee40 fixture 仓改造：全部 bug 上 master + 多 bug 共存布局（学员可直接 clone 复现）\n208ba77 修复 seed-github.sh UTF-8 变量名 bug 和 multi_run 目录 UTC 跨天问题\nd0e472f run.py: 修 online_op 分支 note 未赋值的 UnboundLocalError\ne3c45fd .env.example 补全所有受支持的配置项\nabb28f2 reset.sh：修 s4 复位误删 compose 正式服务的 bug\n994f40c Merge branch 'nested-main'\n92a00b3 测评报告按「模型_日期」再加一层目录，不同模型/不同天互不干扰\nf5c6b84 只保留最完整的一版 Opus 基线，删掉 archive 里被取代的旧快照\n=== grep flag names ===",
+      "signal_types_covered": [
+        "git_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "ls -la workspace/ 2>/dev/null; echo \"=== find ad dir ===\"; ls workspace/ad 2>/dev/null || echo \"no workspace/ad\"",
+        "description": "List workspace directory"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "total 0\ndrwxr-xr-x@  3 user  staff   96  9月  8 12:00 .\ndrwxr-xr-x@ 26 user  staff  832  9月  8 11:58 ..\ndrwxr-xr-x@ 22 user  staff  704  9月  8 12:01 recommendation\n=== find ad dir ===\nno workspace/ad",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== call volume by span (GetAds server) ===\"; curl -s --data-urlencode 'query=sum(traces_span_metrics_calls_total{service_name=\"ad\",span_name=\"oteldemo.AdService/GetAds\"})' 'http://localhost:9090/api/v1/query'; echo; echo \"=== error calls ad ===\"; curl -s --data-urlencode 'query=sum by (span_name,status_code) (traces_span_metrics_calls_total{service_name=\"ad\",status_code=\"STATUS_CODE_ERROR\"})' 'http://localhost:9090/api/v1/query'; echo",
+        "description": "Check ad call volume and errors"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== call volume by span (GetAds server) ===\n{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{},\"value\":[1788854255.645,\"57939\"]}]}}\n=== error calls ad ===\n{\"status\":\"success\",\"data\":{\"resultType\":\"vector\",\"result\":[{\"metric\":{\"span_name\":\"flagd.evaluation.v2.Service/EventStream\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788854255.673,\"101802\"]},{\"metric\":{\"span_name\":\"flagd.evaluation.v2.Service/ResolveBoolean\",\"status_code\":\"STATUS_CODE_ERROR\"},\"value\":[1788854255.673,\"173817\"]}]}}",
+      "signal_types_covered": [
+        "prometheus"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "mcp__aiops_rag__search_past_incidents",
+      "tool_input": {
+        "query": "ad 服务延迟劣化 首页广告位超时 adHighCpu 负载注入开关 CPU读数正常但延迟恶化 指标与业务不一致",
+        "top_k": 3
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "检索到以下历史相似诊断工单（按相似度降序）：\n\n[1] 相似度=0.7485 | 服务=ad | 类型=resource | 当时走向=feishu_low_confidence\n    根因摘要: 告警描述 ad 服务因 flagd 开关 adServiceHighCpu(实际 flag 名 adHighCpu) 导致 CPU 打满、p99 延迟攀升，但当前实时观测与该描述矛盾：flagd 配置中 adHighCpu.defaultVariant 当前为 \"off\"（state=ENABLED 但默认关闭）；Prometheus jvm_cpu_recent_utilization_ratio{job=\"opentelemetry-demo/ad\"} 近 10 分钟稳定在 0.0005~0.0007（近乎空载）；docker stats 显示 ad 容器 CPU 仅 0.15%~0.2%；demo_ad_requests_total 无任何时间序列（无流量）。告警 startsAt 为 2026-06-20，与当前日期 2026-08-17 相差近两个月，且容器为近期新启动（Up ~4min，RestartCount=0），说明当前运行的实例与告警发生时并非同一次生命周期。综合判断：此告警很可能是历史/失效告警，或对应的 flagd 故障注入未在当前环境实际生效/已被回退，当前不存在需要止血的活跃 CPU 饱和问题。因此未执行任何自动处置（白名单内的 scale_resources/restart 均无正当理由使用）；若后续该 flag 被重新置为 on 且 CPU/延迟指标真实抬升，则应对 ad 走 online_op（抬高 CPU 资源上限或临时限流），是否需要代码侧改动需另行评估。\n    处置: 未自动执行处置：当前实时证据显示服务并非处于故障态（flag 关闭、CPU 空载、无流量），不满足\"根因明确\"的止血前提，按规则证据矛盾/不足时不执行任何白名单操作。建议：1) 人工确认此告警是否为陈旧/重复告警（startsAt 与当前时间相差近2个月，且容器为新近启动、RestartCount=0），必要时在告警系统里手动关闭/静音；2) 复核 flagd 配置 vendor/otel-demo/src/flagd/demo.flagd.json 中 adHighCpu 是否曾被置 on 后又回退为 off（当前已是 off，无需再操作）；3) 若重新观测到 jvm_cpu_recent_utilization_ratio{job=\"opentelemetry-demo/ad\"} 明显抬升且伴随请求量同步上涨、p99 恶化，则可对 ad 执行低风险白名单操作 `docker update --cpus <n> ad` 提升资源上限,或 `docker restart ad` 短期止血；若流量平稳但 CPU 高应转为 code_fix 排查热点代码。当前不具备执行条件，交人工继续观察。\n[2] 相似度=0.7427 | 服务=ad | 类型=resource | 当时走向=feishu_low_confidence\n    根因摘要: 告警描述 ad 服务因 flagd 开关 adServiceHighCpu(实际 flag 名 adHighCpu) 打开导致 CPU 打满、p99 攀升，但当前实时观测与描述完全矛盾：flagd 配置 adHighCpu.defaultVariant 当前为 off；jvm_cpu_recent_utilization_ratio{job=\"opentelemetry-demo/ad\"}=0.00059 近乎空载；docker stats 显示 ad 容器 CPU 仅 0.15%，内存正常；demo_ad_requests_total 请求率为 0，无流量；p99 延迟查询为空。告警 startsAt=2026-06-20 与当前(2026-08-18)、与容器 StartedAt=2026-08-17T15:50(RestartCount=0, OOMKilled=false) 相差近两个月，说明当前运行实例与告警触发时并非同一次运行。历史相似工单(4条,相似度0.65~0.77)均得出一致结论：陈旧/失效告警或故障注入未实际生效，无需处置。综合判断本次告警不代表当前存在活跃的 CPU 饱和问题，未执行任何自动处置。\n    处置: 未执行任何操作。证据显示当前不存在活跃故障：flagd adHighCpu 已是 off，CPU/内存/流量/延迟指标均正常。建议：1) 人工核实该告警是否为陈旧/重复告警（startsAt 与当前相差近两个月），必要时在告警系统中静音/关闭；2) 若后续重新观测到 adHighCpu 被置为 on，且 jvm_cpu_recent_utilization_ratio{job=\"opentelemetry-demo/ad\"} 明显抬升并伴随请求量同步上涨、p99 恶化，则应转为 online_op，对 ad（白名单授权目标）执行 `docker update --cpus <n> ad` 提升 CPU 上限或 `docker restart ad` 短期止血；若流量平稳但 CPU 高则应转 code_fix 排查代码热点。当前不具备执行条件，未做任何变更。\n[3] 相似度=0.7286 | 服务=ad | 类型=dependency | 当时走向=auto_remediated\n    根因摘要: ad 服务给广告排序新增了一次用户画像查询调用，这次调用没有配超时；画像服务在一次数据刷新期间响应变慢，ad 服务的请求处理协程大量堆积在等待画像查询返回上，广告位请求整体超时。\n    处置: 已自动执行 docker restart ad 清理堆积的请求处理协程，止血生效；建议给画像查询补上超时，超时后跳过个性化排序直接走默认排序兜底。\n\n注意：历史工单仅供参考，请结合当前实时观测证据独立判断，不要盲目照搬。",
+      "signal_types_covered": [
+        "prometheus",
+        "kubectl_status",
+        "rag_history"
+      ],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "Bash",
+      "tool_input": {
+        "command": "echo \"=== confirm flag again + related ad flags ===\"; for f in adHighCpu adManualGc adFailure; do echo -n \"$f: \"; curl -s -X POST \"http://localhost:8016/ofrep/v1/evaluate/flags/$f\" -H 'Content-Type: application/json' -d '{}'; echo; done",
+        "description": "Re-confirm ad-related flags via OFREP"
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "=== confirm flag again + related ad flags ===\nadHighCpu: {\"value\":true,\"key\":\"adHighCpu\",\"reason\":\"STATIC\",\"variant\":\"on\",\"metadata\":{}}\nadManualGc: {\"value\":false,\"key\":\"adManualGc\",\"reason\":\"STATIC\",\"variant\":\"off\",\"metadata\":{}}\nadFailure: {\"value\":false,\"key\":\"adFailure\",\"reason\":\"STATIC\",\"variant\":\"off\",\"metadata\":{}}",
+      "signal_types_covered": [],
+      "is_repeat_no_new_info": false
+    },
+    {
+      "tool_name": "StructuredOutput",
+      "tool_input": {
+        "summary": "ad 服务延迟劣化的根因是 flagd 功能开关 adHighCpu 被置为 on（负载注入生效）。OFREP 权威读数确认 adHighCpu=true(variant=on)；虽然 docker/JVM 的 CPU 平均读数偏低(0.36%/0.2%)与\"高CPU\"字面矛盾，但用第二信源交叉验证后确认业务症状真实：告警窗口内 GetAds p99 从 ~49ms 基线间歇性飙升至 139/160/320ms，且存在真实流量(GetAds calls=57939、日志持续、load-generator 在跑)。故这是活跃故障（区别于历史上 flag=off、无流量的陈旧告警）。根因即注入开关本身，属功能开关注入的 CPU/延迟症状。止血手段是在 flagd 关闭 adHighCpu 开关——属改配置的高风险操作、不在低风险白名单，故未自动执行，交人工；白名单内的 restart ad 对 flagd 侧开关无效（重启后经 EventStream 重新读到 on 会复现），故也未执行。",
+        "kind": "resource",
+        "suspect_service": "ad",
+        "remediation_type": "online_op",
+        "remediation_detail": "根因：flagd 功能开关 adHighCpu 当前为 on（负载注入），导致 ad 处理路径间歇性 CPU 负载注入、GetAds p99 延迟劣化、首页广告位超时。止血动作（需人工执行，属高风险改配置、不在低风险白名单，我未自动执行）：在 flagd 配置中把 adHighCpu 的 defaultVariant 置回 off（或通过管理面关闭该 flag），ad 会经 flagd EventStream 感知并卸掉注入负载，p99 即恢复至 ~49ms 基线。说明：白名单内的 docker restart ad 对本故障无效——开关状态在 flagd 服务端，重启后 ad 重连 flagd 仍读到 adHighCpu=on 会立即复现，故未执行任何白名单操作。无需改代码（非代码回归，纯开关注入）。",
+        "confidence": 0.78,
+        "also_code_fix": false,
+        "suspect_repo": null,
+        "suspect_commit_hint": null,
+        "suspect_file_hint": null,
+        "time_window": {
+          "from": "2026-09-07T09:35:00Z",
+          "to": "2026-09-08T07:56:00Z"
+        },
+        "evidence": [
+          "OFREP 实时权威值(证据核心)：POST http://localhost:8016/ofrep/v1/evaluate/flags/adHighCpu 返回 {\"value\":true,\"variant\":\"on\",\"reason\":\"STATIC\"} —— 注入开关确实处于 on。同时 adManualGc=off、adFailure=off，排除其它 ad 注入开关。",
+          "矛盾信号交叉验证：docker stats --no-stream ad 显示 CPU 仅 0.36%、jvm_cpu_recent_utilization_ratio{service_name=\"ad\"}=0.00197(~0.2%)，字面与'高CPU'矛盾；但未据此单点否定告警，改用第二信源确认症状真实。",
+          "业务症状二次佐证(Prometheus query_range)：histogram_quantile(0.99, rate(traces_span_metrics_duration_milliseconds_bucket{service_name=\"ad\",span_name=\"oteldemo.AdService/GetAds\"}[5m])) 在告警窗口内从 ~49ms 基线间歇飙升至 139/160/125/320ms，延迟劣化真实存在。",
+          "活跃故障判据(区别于历史陈旧告警)：ad 容器 Up 15h、RestartCount=0、OOMKilled=false；存在真实流量——traces_span_metrics_calls_total GetAds=57939、docker logs ad 持续输出请求、load-generator 容器在运行。历史相似工单[1][2]为 flag=off+无流量的陈旧告警(未处置)，本次 flag=on+有流量+p99真实抬升，性质不同。",
+          "未自动处置的判定：真正止血=在 flagd 关闭 adHighCpu，属改配置高风险、不在低风险白名单(restart/migrate/scale)，交人工；白名单内 docker restart ad 无效(开关在 flagd 服务端，重启后经 EventStream 复读 on 会复现)，故未执行任何白名单命令，执行台账应为空。",
+          "分类依据：症状为功能开关注入引发的 CPU/延迟(资源/容量类)症状，按口径归为 resource(即使由 flag 注入)；非代码回归，故 also_code_fix=false、无 suspect_repo/commit/file(ad 源码未克隆到 workspace，也无需)。"
+        ]
+      },
+      "hook_decision": "passthrough",
+      "hook_action": null,
+      "hook_target": null,
+      "observation": "Structured output provided successfully",
+      "signal_types_covered": [
+        "prometheus",
+        "logs",
+        "kubectl_status"
+      ],
+      "is_repeat_no_new_info": false
+    }
+  ]
+}

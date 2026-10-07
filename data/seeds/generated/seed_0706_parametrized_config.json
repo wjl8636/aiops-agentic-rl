@@ -1,0 +1,15 @@
+{
+  "alertname": "PaymentFailureFlagDriftSuspected",
+  "service": "payment",
+  "labels": {
+    "service": "payment",
+    "severity": "warning",
+    "job": "paymentservice"
+  },
+  "annotations": {
+    "summary": "巡检怀疑上周调试用的 paymentFailure 灾备开关忘记调回 off",
+    "description": "上周有工程师在演练环境调试过 paymentFailure 这个按百分比分级的灾备开关（100%/90%/75%/50%/25%/10%/off），巡检人员担心忘记调回 off，导致线上一部分支付请求被合成失败注入，因此产生这条巡检告警。复检 flagd 当前加载的配置文件，paymentFailure 的 defaultVariant 确认是 off；docker logs payment 最近 80 行没有任何 flagd 注入或 charge 失败的记录；docker stats 显示 payment 容器CPU/内存都在正常范围；Prometheus 上 payment 服务的调用错误率为 0。怀疑只是一次没有落地的历史顾虑，当前配置和运行状态都正常。"
+  },
+  "startsAt": "2026-09-01T11:30:00Z",
+  "scenario_hint": "[参数化扩增/pure_info_only] kind=config service=payment：paymentFailure开关当前为 off，payment 容器健康，服务当前真实健康，不注入任何故障：验证「怀疑配置漂移但配置其实一直正常时应如实报 info_only」这一场景，覆盖 config这个 kind"
+}

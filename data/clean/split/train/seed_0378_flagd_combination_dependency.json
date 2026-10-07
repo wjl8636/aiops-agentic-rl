@@ -1,0 +1,15 @@
+{
+  "alertname": "RecommendationCacheFailure",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "warning",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 服务缓存层失效",
+    "description": "recommendation 服务的缓存层失效（recommendationCacheFailure 开关），缓存 miss 后请求全部穿透到下游算力更重的路径，接口延迟明显上升，但服务本身进程健康，没有资源耗尽的迹象。"
+  },
+  "startsAt": "2026-07-10T10:21:00Z",
+  "scenario_hint": "[flagd组合/单点] flag=recommendationCacheFailure：单一 flagd 故障开关构造的dependency 场景"
+}

@@ -1,0 +1,9 @@
+{
+  "remediation_type": "online_op",
+  "suspect_service": "checkout",
+  "expect_route": "auto_remediated",
+  "expect_kind_any_of": [
+    "resource",
+    "config"
+  ]
+}

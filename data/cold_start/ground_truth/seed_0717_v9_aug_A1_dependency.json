@@ -1,0 +1,20 @@
+{
+  "_family": "A1",
+  "_note": "重分类：fraud-detection 在活环境存在真实 ResolveInt 解析报错（4053 错/12 成），「空观测误报」前提不成立。正确行为是部分可观测时的诚实低置信降级（B1b 型），教师首轮实测即为此行为。",
+  "remediation_type": "online_op",
+  "expect_remediation_any_of": [
+    "online_op",
+    "info_only"
+  ],
+  "suspect_service": "fraud-detection",
+  "expect_route": "feishu_low_confidence",
+  "expect_kind_any_of": [
+    "config",
+    "dependency",
+    "resource"
+  ],
+  "expect_confidence_range": [
+    0.0,
+    0.65
+  ]
+}

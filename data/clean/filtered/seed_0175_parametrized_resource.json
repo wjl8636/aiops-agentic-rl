@@ -1,0 +1,15 @@
+{
+  "alertname": "HighCpuUsage",
+  "service": "ad",
+  "labels": {
+    "service": "ad",
+    "severity": "warning",
+    "job": "adservice"
+  },
+  "annotations": {
+    "summary": "ad 服务 CPU 使用率超过 85%",
+    "description": "监控显示 adservice 容器 CPU 使用率突破 85%（flagd 的 adHighCpu 开关被打开），且延迟 p99 同步恶化。排查没有发现对应的代码发版，CPU 曲线跟入口流量曲线高度吻合，更像是资源型瓶颈而不是代码问题。"
+  },
+  "startsAt": "2026-07-04T21:00:00Z",
+  "scenario_hint": "[参数化扩增/resource_cpu] threshold=85% severity=warning：验证资源型 CPU 场景在不同阈值/严重度下的泛化"
+}

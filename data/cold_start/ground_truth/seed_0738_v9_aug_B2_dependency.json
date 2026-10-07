@@ -1,0 +1,15 @@
+{
+  "remediation_type": "info_only",
+  "suspect_service": "email",
+  "expect_route": "info_only",
+  "expect_kind_any_of": [
+    "dependency",
+    "deploy_regression",
+    "config"
+  ],
+  "expect_confidence_range": [
+    0.5,
+    0.85
+  ],
+  "_family": "B2"
+}

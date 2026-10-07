@@ -1,0 +1,15 @@
+{
+  "alertname": "MemoryLeakOOM",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 服务内存持续上涨、趋向 OOM",
+    "description": "观察到 recommendation（Python/gRPC）在负载下内存不断攀升，最终触发 OOM 被强制重启，且重启频率还在增加。这个趋势是从最新一次发版开始出现的，怀疑是最近一次发版引入的某个 commit 里，对一个全局/请求级的 list 做了 append 但从未清理或做长度上限控制，随着请求量增加持续增长，最终把工作集内存吃满。"
+  },
+  "startsAt": "2026-07-06T00:45:00Z",
+  "scenario_hint": "[参数化扩增/deploy_regression] 泄漏机制=无界 list append（unbounded_list_append）：内存泄漏 capstone 的泄漏点变体，对应 scripts/fixtures/recommendation 的不同 fixture 版本"
+}

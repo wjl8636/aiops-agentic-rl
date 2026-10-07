@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "checkout",
+  "labels": {
+    "service": "checkout",
+    "severity": "critical",
+    "job": "checkoutservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0009-checkout-dependency",
+    "description": "checkout 在下单流程里新增了一次对第三方反欺诈评分服务的调用，这次调用没有配超时，评分服务偶发性变慢直接拖慢整条下单链路，checkout 自身线程池被占满，前端下单按钮长时间无响应。"
+  },
+  "startsAt": "2026-07-20T08:45:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0009-checkout-dependency：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

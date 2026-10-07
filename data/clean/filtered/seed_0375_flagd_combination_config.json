@@ -1,0 +1,15 @@
+{
+  "alertname": "FrontendImageSlowLoad",
+  "service": "frontend",
+  "labels": {
+    "service": "frontend",
+    "severity": "warning",
+    "job": "frontend"
+  },
+  "annotations": {
+    "summary": "frontend 图片加载延迟异常升高",
+    "description": "frontend 首页图片加载耗时显著升高（imageSlowLoad 开关被设为非 off 档），该行为完全由一次功能开关配置变更触发，没有对应的代码发版，也没有下游依赖报错或资源占用异常，纯粹是配置项本身的取值问题。"
+  },
+  "startsAt": "2026-07-10T10:00:00Z",
+  "scenario_hint": "[flagd组合/单点] flag=imageSlowLoad：单一 flagd 故障开关构造的config 场景"
+}

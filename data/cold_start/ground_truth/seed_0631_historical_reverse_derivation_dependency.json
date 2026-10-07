@@ -1,0 +1,9 @@
+{
+  "remediation_type": "code_fix",
+  "suspect_service": "email",
+  "expect_route": "feishu_fix_unverified",
+  "expect_kind_any_of": [
+    "dependency",
+    "deploy_regression"
+  ]
+}

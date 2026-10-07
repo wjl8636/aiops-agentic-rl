@@ -1,0 +1,15 @@
+{
+  "alertname": "NotificationConsumerBehind",
+  "service": "kafka",
+  "labels": {
+    "service": "kafka",
+    "severity": "warning",
+    "job": "kafka"
+  },
+  "annotations": {
+    "summary": "notifications topic 消费 lag 缓慢爬升，通知发送延迟加大",
+    "description": "notifications topic 的消费 lag 从今早开始缓慢爬升，目前已积压五千多条，站内信与邮件通知的发送延迟越来越明显。消费者组健康（无重启、无报错）、broker 状态正常，怀疑 kafka 队列侧的消费链路异常（kafkaQueueProblems 开关）。通知延迟会引发用户投诉，请确认 kafka 侧队列消费链路的根因。"
+  },
+  "startsAt": "2026-09-06T16:10:00Z",
+  "scenario_hint": "[v9增强/B1a_交叉验证] flags=kafkaQueueProblems：注入真实故障但观测信号降级（Prometheus lag 冻结/ad 机制不生效/后端不可观测），OFREP 是权威第一信源——验证「OFREP 查 flag → Prometheus 读数正常不据此否定 → 换第二信源交叉验证 → 收敛输出 kind/route/confidence，不执行白名单外操作」"
+}

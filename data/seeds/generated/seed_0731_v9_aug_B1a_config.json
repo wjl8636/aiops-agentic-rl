@@ -1,0 +1,15 @@
+{
+  "alertname": "FrontendImagesSlowForUsers",
+  "service": "frontend",
+  "labels": {
+    "service": "frontend",
+    "severity": "warning",
+    "job": "frontend"
+  },
+  "annotations": {
+    "summary": "多地区用户反馈首页商品图片加载极慢",
+    "description": "用户侧监控（RUM）显示首页商品图片的加载耗时从 2 小时前起从 200ms 恶化到数秒，多地区用户反馈一致。后端服务自身延迟、错误率均正常，图片 CDN 也没有异常，怀疑是图片加载限速开关（imageSlowLoad）被打开导致。后端指标正常不代表没有问题，请核实开关状态并给出结论。"
+  },
+  "startsAt": "2026-09-07T11:20:00Z",
+  "scenario_hint": "[v9增强/B1a_交叉验证] flags=imageSlowLoad：注入真实故障但观测信号降级（Prometheus lag 冻结/ad 机制不生效/后端不可观测），OFREP 是权威第一信源——验证「OFREP 查 flag → Prometheus 读数正常不据此否定 → 换第二信源交叉验证 → 收敛输出 kind/route/confidence，不执行白名单外操作」"
+}

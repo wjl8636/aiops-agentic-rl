@@ -1,0 +1,8 @@
+{
+  "remediation_type": "info_only",
+  "suspect_service": "recommendation",
+  "expect_route": "info_only",
+  "expect_kind_any_of": [
+    "resource"
+  ]
+}

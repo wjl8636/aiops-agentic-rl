@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "quote",
+  "labels": {
+    "service": "quote",
+    "severity": "warning",
+    "job": "quoteservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0012-quote-dependency",
+    "description": "quote 服务内部调用一个独立部署的运费计算 gRPC 依赖，这次调用没有配超时；运费计算依赖一次版本升级引入了性能回退，响应显著变慢，quote 服务的请求处理协程大量堆积，quote 对上游 shipping 出现级联超时。"
+  },
+  "startsAt": "2026-07-22T08:00:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0012-quote-dependency：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

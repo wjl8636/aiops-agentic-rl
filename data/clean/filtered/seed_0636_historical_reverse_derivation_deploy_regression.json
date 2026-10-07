@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0066-recommendation-deploy_regression",
+    "description": "recommendation（Python/gRPC）在最新发版（镜像 tag=git SHA f18f452，deploys.log 标记 LATEST_DEPLOY suspect，替换 baseline ac26792）后工作集内存单调上升、趋向 OOM。根因是 recommendation_server.py 中模块级列表 _seen_product_ids 从 deque(maxlen=128) 被改为无界 list，每次 get_recommendations 请求都 extend 且从不裁剪，持续负载下内存无上限增长直至 OOM。属混合根因：已重启止血，但需改代码根治否则下次发版复发。"
+  },
+  "startsAt": "2026-07-21T22:15:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0066-recommendation-deploy_regression：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

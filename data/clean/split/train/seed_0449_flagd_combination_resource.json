@@ -1,0 +1,15 @@
+{
+  "alertname": "RecommendationDegradedByQueueAndCache",
+  "service": "recommendation",
+  "labels": {
+    "service": "recommendation",
+    "severity": "critical",
+    "job": "recommendation"
+  },
+  "annotations": {
+    "summary": "recommendation 因队列积压叠加缓存失效双重承压",
+    "description": "kafka 消费 lag 持续堆积（kafkaQueueProblems），同时 recommendation 自身缓存层失效（recommendationCacheFailure），两者叠加导致 recommendation 既要处理滞后的事件流又要承担缓存穿透后的算力压力，接口延迟和超时率同步上升，CPU/内存本身没有明显异常，判断是跨服务的复合资源型压力而非单点故障。"
+  },
+  "startsAt": "2026-07-11T22:28:00Z",
+  "scenario_hint": "[flagd组合/多点] flags=kafkaQueueProblems+recommendationCacheFailure：多个 flagd 故障开关同时注入构造的复合 resource 场景"
+}

@@ -1,0 +1,15 @@
+{
+  "alertname": "HistoricalTicketReplay",
+  "service": "cart",
+  "labels": {
+    "service": "cart",
+    "severity": "warning",
+    "job": "cartservice"
+  },
+  "annotations": {
+    "summary": "历史工单反演：milvus-0005-cart-dependency",
+    "description": "cart 团队上线了一个购物车对账批处理脚本，脚本里的下游查询同样忘记设超时，占满 cart 的处理线程池，checkout 调用 cart 接口大面积超时。"
+  },
+  "startsAt": "2026-07-21T00:30:00Z",
+  "scenario_hint": "[历史工单反演/milvus] source_ticket=milvus-0005-cart-dependency：从 AIops-agent 的 Milvus 历史工单集合检索出的真实工单反向抽取的告警"
+}

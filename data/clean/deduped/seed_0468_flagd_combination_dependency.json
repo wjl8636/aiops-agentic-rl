@@ -1,0 +1,15 @@
+{
+  "alertname": "CheckoutCascadingDependencyFailure",
+  "service": "checkout",
+  "labels": {
+    "service": "checkout",
+    "severity": "critical",
+    "job": "checkoutservice"
+  },
+  "annotations": {
+    "summary": "checkout 下单链路多个依赖同时异常",
+    "description": "checkout 服务在下单链路上同时命中两个依赖异常：product-catalog 对部分商品返回失败（productCatalogFailure），payment 按比例拒绝扣款（paymentFailure）。两个故障叠加导致下单成功率大幅下降，checkout 自身没有代码发版，属于多点依赖故障组合。"
+  },
+  "startsAt": "2026-07-12T01:57:00Z",
+  "scenario_hint": "[flagd组合/多点] flags=productCatalogFailure+paymentFailure：多个 flagd 故障开关同时注入构造的复合 dependency 场景"
+}
